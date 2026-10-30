@@ -4,12 +4,12 @@
 import { execFileSync } from 'node:child_process'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { site } from '../src/config/site.ts'
 
-const root = new URL('..', import.meta.url).pathname.replace(/^\\/([A-Za-z]:)/, '$1')
+const root = fileURLToPath(new URL('..', import.meta.url))
 const templateDir = join(root, 'seed', 'templates')
-const fixtureDir = join(root, 'tests', 'fixtures')
-for (const dir of [templateDir, fixtureDir]) mkdirSync(dir, { recursive: true })
+mkdirSync(templateDir, { recursive: true })
 
 const W = 540
 const H = 960
@@ -52,11 +52,4 @@ for (const style of site.styles) {
   }
 }
 
-// e2e 上传 fixture：抽象头像，仅用于自动化测试，不会作为首页示例展示。
-const portrait =
-  "geq=r='if(lt(hypot(X-270\\\\,Y-260)\\\\,105)\\\\,40\\\\,if(lt(hypot(X-270\\\\,Y-640)\\\\,230)*lt(Y\\\\,720)*gt(Y\\\\,420)\\\\,40\\\\,200+40*Y/H))'" +
-  ":g='if(lt(hypot(X-270\\\\,Y-260)\\\\,105)\\\\,30\\\\,if(lt(hypot(X-270\\\\,Y-640)\\\\,230)*lt(Y\\\\,720)*gt(Y\\\\,420)\\\\,30\\\\,150+60*X/W))'" +
-  ":b='if(lt(hypot(X-270\\\\,Y-260)\\\\,105)\\\\,60\\\\,if(lt(hypot(X-270\\\\,Y-640)\\\\,230)*lt(Y\\\\,720)*gt(Y\\\\,420)\\\\,60\\\\,230))'"
-ffmpeg(['-f', 'lavfi', '-i', `color=s=540x720:d=1,${portrait}`, '-frames:v', '1', '-q:v', '3', join(fixtureDir, 'photo.jpg')])
-
-console.log('Generated local-only Tiny Desk reference placeholders and the e2e photo fixture.')
+console.log('Generated local-only Tiny Desk reference placeholders. Replace them with original or licensed performance clips before production.')
