@@ -1,5 +1,5 @@
 import type { Hono } from 'hono'
-import { sellingPlans, site } from '#/config/site'
+import { site } from '#/config/site'
 import { ALERT_RULES } from './alerts'
 import { emailConfig } from './email'
 import { audit, requireAdmin } from './http'
@@ -72,8 +72,9 @@ async function probePayment(env: Env, override: string): Promise<Outcome> {
   const id = activePaymentProviderId(env, override)
   if (id === 'mock') return ok('mock 支付，不调用外部接口')
   const products = parseJsonRecord(id === 'dodo' ? env.DODO_PRODUCTS : id === 'stripe' ? env.STRIPE_PRODUCTS : env.WAFFO_PRODUCTS)
-  // 积分包和订阅套餐都要有商品
-  const items = [...site.packages, ...sellingPlans]
+  // 订阅关闭只会停止新订阅，不会终止已有订阅的续费和退款。
+  // 因此支付探测仍须检查 site.plans 中的商品；sellingPlans 只用于新销售入口。
+  const items = [...site.packages, ...site.plans]
   const missing = items.filter((pack) => !products[pack.id]).map((pack) => pack.id)
   if (id === 'waffo') {
     // 用不存在的订单号查一次付款：能返回空列表说明商户号、私钥和签名都正确
@@ -124,7 +125,8 @@ async function probeStripePrices(
 ): Promise<Outcome> {
   const apiKey = cleanSecret(env.STRIPE_SECRET_KEY)
   if (!apiKey) return fail('STRIPE_SECRET_KEY 未配置')
-  const planIntervals = new Map(sellingPlans.map((plan) => [plan.id, plan.interval]))
+  // 即使 subscriptionsEnabled=false，已有订阅仍会续费，Price 仍须保持 recurring 周期正确。
+  const planIntervals = new Map(site.plans.map((plan) => [plan.id, plan.interval]))
   const problems = missing.map((packId) => `${packId}：STRIPE_PRODUCTS 里没有 Price ID`)
   const warnings: string[] = []
   for (const pack of items) {
