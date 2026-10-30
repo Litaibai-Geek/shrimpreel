@@ -32,7 +32,7 @@ export const site = {
     fullSeconds: 18,
   },
 
-  // 舞蹈风格：一个站点可以配多种，第一个是默认风格；只有一种时界面不显示风格选择。
+  // 表演场景：一个站点可以配置多种，第一个是默认场景；只有一种时界面不显示场景选择。
   // 源视频上传到 R2 的 templates/<文件名>，由 /media/templates/<文件名> 公开提供给 provider 拉取。
   // 风格的展示名和一句话介绍写在 src/content/<locale>.ts 的 styles[id]（缺了 typecheck 报错）。
   styles: [
@@ -40,18 +40,20 @@ export const site = {
       // 写入 generations.template_id，发布后不要改
       id: 'tiny-desk-v1',
       // 键 = durations[].id，每个档位都要有
+      // TODO(site): add original or licensed desk-session reference clips before production; these files are not in the repo yet.
       sources: { short: 'tiny-desk-v1-6s.mp4', medium: 'tiny-desk-v1-12s.mp4', full: 'tiny-desk-v1-18s.mp4' },
       // 这种风格的 prompt，覆盖 video.yir.prompt 和 video.nanoapi.prompt；null = 用默认
       prompt: null as string | null,
       // yir 两步走（可选）：先用图片模型把照片里的人合成进源视频首帧，再拿合成图做动作参考，成片保留源视频的场景。
       // null = 单步，直接用用户照片做参考，背景会变成照片的背景。图片模型等共用参数在 video.yir.sceneImage
       scene: null as StyleScene | null,
-      // 首页展示素材（public/demo/）。换成真实素材时必须拥有授权，credit 写原作者，例如 '@handle · TikTok'。
+      // 首页展示素材（public/demo/）。必须是自有或已获授权素材，并在 credit 写明来源。
+      // TODO(site): replace inherited Neon Shuffle demo media with Tiny Desk AI examples before production.
       examples: {
-        original: { video: '/demo/original.mp4', poster: '/demo/original.jpg', credit: 'Demo clip · original' },
+        original: { video: '/demo/original.mp4', poster: '/demo/original.jpg', credit: 'Temporary inherited demo · replace before launch' },
         aiVersions: [
-          { video: '/demo/ai1.mp4', poster: '/demo/ai1.jpg', credit: 'Demo clip · AI render' },
-          { video: '/demo/ai2.mp4', poster: '/demo/ai2.jpg', credit: 'Demo clip · AI render' },
+          { video: '/demo/ai1.mp4', poster: '/demo/ai1.jpg', credit: 'Temporary inherited demo · replace before launch' },
+          { video: '/demo/ai2.mp4', poster: '/demo/ai2.jpg', credit: 'Temporary inherited demo · replace before launch' },
         ],
         madeWith: { photo: '/demo/sample-photo.jpg', video: '/demo/madeWith.mp4', poster: '/demo/madeWith.jpg' },
       },
@@ -59,6 +61,7 @@ export const site = {
   ],
 
   // 全站共用的首页展示素材
+  // TODO(site): replace inherited Neon Shuffle media in public/demo/ before production.
   examples: {
     // “创意”区块：每条 = 一张示例照片 + 一段成片
     ideas: [
@@ -129,7 +132,7 @@ export const site = {
   // 开关 subscriptionsEnabled：false 时不再卖新订阅（定价页、条款、退款政策和 FAQ 里的订阅内容一起隐藏，下单接口拒绝套餐），
   // 已有订阅照常续费、退款，账单页仍能取消和进门户；这时要保留 *_PRODUCTS 里套餐的商品，支付商 webhook 也别退订订阅事件。
   // 使用手册见 docs/subscriptions.md
-  subscriptionsEnabled: true as boolean,
+  subscriptionsEnabled: false as boolean,
   plans: [
     { id: 'monthly', interval: 'month', credits: 60, priceCents: 1490, currency: 'USD' },
     { id: 'yearly', interval: 'year', credits: 60, priceCents: 14900, currency: 'USD', highlight: true },
@@ -174,13 +177,13 @@ export const site = {
   // cover 可选：public/ 下 1200×630 的图片路径，用在列表卡片、文章顶部、og:image 和 Article 的 image；
   // 用 scripts/article-cover.mjs 从站点自己的视频截帧生成（带标题、标签，可选多种版式）。不填时卡片没有图，og:image 用站点默认图
   articles: [
-    { key: 'trend', slug: 'tiny-desk-ai-trend', publishedAt: '2026-10-30', updatedAt: '2026-10-30', cover: '/guides/neon-shuffle-ai-trend.jpg' },
+    { key: 'trend', slug: 'tiny-desk-ai-trend', publishedAt: '2026-10-30', updatedAt: '2026-10-30' },
     { key: 'howTo', slug: 'how-to-make-tiny-desk-ai-video', publishedAt: '2026-10-30', updatedAt: '2026-10-30' },
   ],
 
   seo: {
     // 长尾词：不输出 meta keywords（Google 不用），由 npm run seo:check 检查首页正文是否覆盖
-    secondaryKeywords: ['Tiny Desk AI', 'Tiny Desk video', 'Tiny Desk trend', 'tiny desk ai generator', 'tiny desk ai video generator', 'tiny desk ai trend', 'how to make tiny desk ai video', 'outstanding tiny desk ai'],
+    secondaryKeywords: ['Tiny Desk AI generator', 'Tiny Desk AI video generator', 'Tiny Desk AI video from a photo', 'how to make a Tiny Desk AI video', 'AI Tiny Desk performance', 'Tiny Desk-style AI video'],
     // 首次上线日期与站点页面（首页、价格、法律页等）最近一次内容更新日期：首页视频 uploadDate、sitemap lastmod。文章用各自的日期
     publishedAt: '2026-10-30',
     updatedAt: '2026-10-30',
