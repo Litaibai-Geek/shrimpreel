@@ -15,11 +15,11 @@ export const LOCALE_META: Record<Locale, { tag: string; ogLocale: string; name: 
 }
 
 export const site = {
-  keyword: 'Neon Shuffle',
-  brandName: 'Neon Shuffle AI',
-  logoMark: 'NS',
-  domain: 'example.com',
-  supportEmail: 'support@example.com',
+  keyword: 'Tiny Desk',
+  brandName: 'Tiny Desk AI',
+  logoMark: 'TD',
+  domain: 'tinydeskai.website',
+  supportEmail: 'support@tinydeskai.website',
   // 社媒平台名称（用于 “Viral on TikTok” 之类标签）
   trendPlatform: 'TikTok',
   ogImage: '/og.png',
@@ -38,9 +38,9 @@ export const site = {
   styles: [
     {
       // 写入 generations.template_id，发布后不要改
-      id: 'neon-shuffle-v1',
+      id: 'tiny-desk-v1',
       // 键 = durations[].id，每个档位都要有
-      sources: { short: 'neon-shuffle-v1-6s.mp4', medium: 'neon-shuffle-v1-12s.mp4', full: 'neon-shuffle-v1-18s.mp4' },
+      sources: { short: 'tiny-desk-v1-6s.mp4', medium: 'tiny-desk-v1-12s.mp4', full: 'tiny-desk-v1-18s.mp4' },
       // 这种风格的 prompt，覆盖 video.yir.prompt 和 video.nanoapi.prompt；null = 用默认
       prompt: null as string | null,
       // yir 两步走（可选）：先用图片模型把照片里的人合成进源视频首帧，再拿合成图做动作参考，成片保留源视频的场景。
@@ -174,16 +174,16 @@ export const site = {
   // cover 可选：public/ 下 1200×630 的图片路径，用在列表卡片、文章顶部、og:image 和 Article 的 image；
   // 用 scripts/article-cover.mjs 从站点自己的视频截帧生成（带标题、标签，可选多种版式）。不填时卡片没有图，og:image 用站点默认图
   articles: [
-    { key: 'trend', slug: 'neon-shuffle-ai-trend', publishedAt: '2026-10-20', updatedAt: '2026-10-20', cover: '/guides/neon-shuffle-ai-trend.jpg' },
-    { key: 'howTo', slug: 'how-to-make-neon-shuffle-ai-video', publishedAt: '2026-10-20', updatedAt: '2026-10-20' },
+    { key: 'trend', slug: 'tiny-desk-ai-trend', publishedAt: '2026-10-30', updatedAt: '2026-10-30', cover: '/guides/neon-shuffle-ai-trend.jpg' },
+    { key: 'howTo', slug: 'how-to-make-tiny-desk-ai-video', publishedAt: '2026-10-30', updatedAt: '2026-10-30' },
   ],
 
   seo: {
     // 长尾词：不输出 meta keywords（Google 不用），由 npm run seo:check 检查首页正文是否覆盖
-    secondaryKeywords: ['Neon Shuffle AI', 'Neon Shuffle video', 'Neon Shuffle trend', 'AI dance video'],
+    secondaryKeywords: ['Tiny Desk AI', 'Tiny Desk video', 'Tiny Desk trend', 'tiny desk ai generator', 'tiny desk ai video generator', 'tiny desk ai trend', 'how to make tiny desk ai video', 'outstanding tiny desk ai'],
     // 首次上线日期与站点页面（首页、价格、法律页等）最近一次内容更新日期：首页视频 uploadDate、sitemap lastmod。文章用各自的日期
-    publishedAt: '2026-10-20',
-    updatedAt: '2026-10-20',
+    publishedAt: '2026-10-30',
+    updatedAt: '2026-10-30',
     // Search Console / Bing Webmaster 选“HTML 标记”验证时填 content 值；用 DNS 验证则留空
     googleVerification: '',
     bingVerification: '',

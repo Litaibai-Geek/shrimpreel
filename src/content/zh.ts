@@ -12,7 +12,7 @@ export function zh(s: S): Content {
   const subs = s.subscriptionsEnabled && s.plans.length > 0
   const b = s.brandName
   const styles: Record<StyleId, StyleCopy> = {
-    'neon-shuffle-v1': { name: k, tagline: '逐拍还原原版舞步。' },
+    'tiny-desk-v1': { name: k, tagline: '逐拍还原原版舞步。' },
   }
   const { uploadDays, outputDays } = s.retention
   const photoRetention = uploadDays > 0 ? `在上传 ${uploadDays} 天后自动删除` : '保留到你主动删除为止'

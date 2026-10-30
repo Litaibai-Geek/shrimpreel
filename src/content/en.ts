@@ -23,7 +23,7 @@ export function en(s: S) {
   const { ga4Id, cfBeaconToken, umamiWebsiteId } = s.analytics
   // 每种风格的展示名和一句话介绍；site.styles 加风格时这里补一项（缺了 typecheck 报错），zh.ts 同
   const styles: Record<StyleId, StyleCopy> = {
-    'neon-shuffle-v1': { name: k, tagline: 'The original routine, beat for beat.' },
+    'tiny-desk-v1': { name: k, tagline: 'The original routine, beat for beat.' },
   }
   return {
     styles,
