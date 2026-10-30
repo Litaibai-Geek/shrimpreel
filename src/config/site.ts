@@ -50,12 +50,10 @@ export const site = {
       // 首页展示素材（public/demo/）。必须是自有或已获授权素材，并在 credit 写明来源。
       // TODO(site): replace inherited Neon Shuffle demo media with Tiny Desk AI examples before production.
       examples: {
-        original: { video: '/demo/original.mp4', poster: '/demo/original.jpg', credit: 'Temporary inherited demo · replace before launch' },
-        aiVersions: [
-          { video: '/demo/ai1.mp4', poster: '/demo/ai1.jpg', credit: 'Temporary inherited demo · replace before launch' },
-          { video: '/demo/ai2.mp4', poster: '/demo/ai2.jpg', credit: 'Temporary inherited demo · replace before launch' },
-        ],
-        madeWith: { photo: '/demo/sample-photo.jpg', video: '/demo/madeWith.mp4', poster: '/demo/madeWith.jpg' },
+        // 示例素材先留空；补充自有或授权素材后再填路径。
+        original: { video: '', poster: '', credit: '' },
+        aiVersions: [],
+        madeWith: { photo: '', video: '', poster: '' },
       },
     },
   ],
@@ -63,12 +61,8 @@ export const site = {
   // 全站共用的首页展示素材
   // TODO(site): replace inherited Neon Shuffle media in public/demo/ before production.
   examples: {
-    // “创意”区块：每条 = 一张示例照片 + 一段成片
-    ideas: [
-      { photo: '/demo/sample-photo.jpg', video: '/demo/ai1.mp4', poster: '/demo/ai1.jpg' },
-      { photo: '/demo/sample-photo.jpg', video: '/demo/ai2.mp4', poster: '/demo/ai2.jpg' },
-      { photo: '/demo/sample-photo.jpg', video: '/demo/madeWith.mp4', poster: '/demo/madeWith.jpg' },
-    ],
+    // 首页示例视频位暂时留空，避免展示模板项目继承的旧演示素材。
+    ideas: [],
   },
 
   // 视频模型，服务商由 VIDEO_PROVIDER 选择。换模型时同时检查 src/server/video/ 下对应文件的入参与出参。

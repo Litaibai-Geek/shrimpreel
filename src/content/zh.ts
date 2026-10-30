@@ -59,12 +59,12 @@ export function zh(s: S): Content {
     },
     hero: {
       title: `${k} AI 视频生成器`,
-      subtitle: '用一张人物照片生成桌边小型现场演出风格的 AI 视频。参考片段提供动作与镜头节奏，上传照片决定画面中呈现的人物。',
+      subtitle: '用一张照片制作 Tiny Desk AI 视频。参考片段提供动作与镜头构图，人像照片决定生成画面中呈现的人物。',
       badge: '桌边现场风格视频生成器',
       original: '参考片段',
       aiVersion: 'AI 预览',
       chips: ['一张人物照片', '参考视频引导动作', '6 / 12 / 18 秒短片'],
-      creditNote: '当前演示素材仅用于占位，上线前会替换为 Tiny Desk AI 专属示例。',
+      creditNote: '示例视频位暂时留空，完成模型测试并准备好自有或已授权素材后再补充。',
     },
     generator: {
       title: '制作你的视频',

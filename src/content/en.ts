@@ -66,12 +66,12 @@ export function en(s: S) {
     },
     hero: {
       title: `${k} AI Video Generator`,
-      subtitle: 'Create a short desk-session-style performance video from one portrait. The reference clip guides movement and framing; your photo provides the person featured in the AI-generated result.',
+      subtitle: 'Create a Tiny Desk AI video from a photo. A reference clip guides movement and framing while your portrait provides the person featured in the generated desk-session-style performance.',
       badge: 'Desk-session video creator',
       original: 'Reference clip',
       aiVersion: 'AI preview',
       chips: ['One portrait photo', 'Reference-guided motion', '6, 12 or 18 seconds'],
-      creditNote: 'Preview media is temporary and will be replaced with Tiny Desk AI examples before launch.',
+      creditNote: 'Example video slots are intentionally empty until model testing is complete and original or licensed clips are ready.',
     },
     generator: {
       // 只给读屏用（sr-only），不放关键词，避免隐藏文字堆词
