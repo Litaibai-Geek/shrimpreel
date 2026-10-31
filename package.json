@@ -24,7 +24,8 @@
     "doctor": "node scripts/doctor.mjs",
     "deploy": "npm run doctor && npm run build && wrangler deploy",
     "media:placeholder": "node scripts/generate-placeholder-media.mjs",
-    "media:download": "node scripts/download-demo-media.mjs"
+    "media:download": "node scripts/download-demo-media.mjs",
+    "setup": "node scripts/bootstrap-site.mjs"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "1.64.0",

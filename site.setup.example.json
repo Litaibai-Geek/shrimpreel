@@ -1,0 +1,23 @@
+{
+  "site": {
+    "name": "tinydeskai",
+    "domain": "tinydeskai.website",
+    "adminEmail": "admin@example.com"
+  },
+  "google": {
+    "clientId": ""
+  },
+  "payment": {
+    "provider": "waffo",
+    "environment": "test",
+    "storeId": "",
+    "createProducts": false
+  },
+  "turnstile": {
+    "siteKey": ""
+  },
+  "secrets": {
+    "file": ".dev.vars.production",
+    "sync": true
+  }
+}

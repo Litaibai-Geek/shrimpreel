@@ -37,6 +37,18 @@ A 72-second tour, no sound ([Chinese version](README.zh-CN.md); MP4 files in [do
 
 Release notes: [CHANGELOG.md](CHANGELOG.md). Feature notes and plans: [docs/SAAS_VIDEO_FEATURES.md](docs/SAAS_VIDEO_FEATURES.md) and [ROADMAP.md](ROADMAP.md). SEO rules, keyword planning and audit results: [docs/SEO_AUDIT.md](docs/SEO_AUDIT.md). All environment variables and the launch-related `site.ts` fields: [docs/env.md](docs/env.md). Adding a payment provider and the webhook response-code contract: [docs/payments.md](docs/payments.md). The subscription switch, plans and provider setup: [docs/subscriptions.md](docs/subscriptions.md). Conventions to follow before changing code (credits, payment fulfillment, bilingual copy, migrations, e2e): [AGENTS.md](AGENTS.md). The docs/ files and AGENTS.md are in Chinese.
 
+## Fast Cloudflare setup for a new site
+
+After running `scripts/new-site.mjs` for new keywords and replacing the site-specific media/copy, use `scripts/bootstrap-site.mjs` to provision D1, R2, KV and Queues safely. Copy `site.setup.example.json` to gitignored `site.setup.json` and fill the public settings; put secrets only in `.dev.vars.production`.
+
+```powershell
+npm run setup -- --plan
+npm run setup -- --apply
+npm run setup -- --verify
+```
+
+No automatic deployment or secret overwrites. See [V1 bootstrap guide](docs/bootstrap-site.md) for Waffo, initial-Worker limitations, and optional migration flags.
+
 ## Demo media
 
 The homepage MP4 previews in `public/demo/` were replaced by the site owner with real AI-generated demos. `src/config/demo-media.ts` reflects the current labels. The existing file paths are retained so previous video assets do not need to be renamed. Do not overwrite these demos by running the original stock downloader.
