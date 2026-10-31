@@ -192,7 +192,7 @@ export function Generator({ styleId: controlledStyleId, onStyleChange }: { style
             {STYLES.map((style) => {
               const active = style.id === styleId
               const copy = c.styles[style.id as keyof typeof c.styles]
-              const thumb = style.examples.aiVersions[0]
+              const thumb = style.examples.previews.find((clip) => clip.poster)
               return (
                 <button
                   key={style.id}

@@ -173,7 +173,7 @@ async function probeStripePrices(
 
 function balanceOutcome(amount: number, currency: string, provider: string, amountUsd?: number) {
   const text = currency === 'credits' && amountUsd !== undefined
-    ? `${amount.toFixed(2)} credits (~${amountUsd.toFixed(2)})`
+    ? `${amount.toFixed(2)} credits (~$${amountUsd.toFixed(2)})`
     : `${amount.toFixed(2)} ${currency}`
   const usd = amountUsd ?? amount
   return usd < ALERT_RULES.provider_balance.lowUsd ? warn(`鉴权正常，但 ${provider} 余额只剩 ${text}，请尽快充值`) : ok(`鉴权正常，余额 ${text}`)

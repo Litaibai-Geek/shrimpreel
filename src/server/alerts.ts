@@ -76,7 +76,7 @@ export function evaluateHealth(stats: HealthStats): Alert[] {
   const balanceUsd = balance?.amountUsd ?? balance?.amount
   if (balance && balanceUsd !== undefined && balanceUsd < ALERT_RULES.provider_balance.lowUsd) {
     const display = balance.currency === 'credits' && balance.amountUsd !== undefined
-      ? `${balance.amount.toFixed(2)} credits (~${balance.amountUsd.toFixed(2)})`
+      ? `${balance.amount.toFixed(2)} credits (~$${balance.amountUsd.toFixed(2)})`
       : `${balance.amount.toFixed(2)} ${balance.currency}`
     alerts.push(alert('provider_balance', 1, { detail: `${balance.provider} 余额 ${display}` }))
   }
