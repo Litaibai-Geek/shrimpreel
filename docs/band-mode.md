@@ -8,6 +8,13 @@
 - Prompts provide role hints, but Seedance Mini does **not** guarantee each face/role or full ensemble appears accurately. Results must be checked in production before advertising guaranteed multi-person face swaps.
 - The group picker starts with file selection order. Left/right controls allow moving each portrait into its intended numbered role without re-uploading. The user can reselect photos to replace the entire group. Band does not modify or download the homepage demonstration media.
 
+## Band privacy and takedown
+
+- Admins can select a specific Band participant to remove the reported video and all other Solo/Band videos that reuse the same participant's image by upload ID or SHA-256, including copies in other accounts. The other participants' unrelated photos stay usable.
+- Admins can explicitly choose `all` to remove and block all member photos and all related videos; verify the complaint's scope before using that broader option.
+- The audit log records `memberUploadId`. Legacy Solo reports still remove duplicate videos of the one original portrait.
+- The user's JSON account export includes the full ordered Band image reference list. No D1 schema migration is required.
+
 ## Local verification before deployment
 1. Run npm ci, npm run typecheck, npm test, npm run build, and npm run doctor.
 2. Test existing Solo flow, then upload 2, 3 and 5 separate adult photos. Confirm roles in file-order preview, that generation memberCount matches, and that Kie receives 2/3/5 ordered image URLs.

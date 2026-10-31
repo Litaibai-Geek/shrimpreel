@@ -1,4 +1,5 @@
 import { site } from '#/config/site'
+import { generationPhotoIds, takedownMatchSql } from './takedown-scope'
 import { failGeneration } from './jobs'
 import { notifyTakedownCreated } from './notifications'
 import type { GenerationRow, UploadRow, UserRow } from './types'
@@ -94,66 +95,76 @@ async function generationIdFromShareLink(env: Env, text: string) {
   return row?.id ?? null
 }
 
-// 下架：同一张原图（按 sha256，包括其他账号上传的同一文件）生成的所有成片和原图都删除，
-// 进行中的任务判失败并退款，再把哈希加入黑名单阻止重新上传
-export async function removeReportedContent(env: Env, generation: GenerationRow, takedownId: string) {
+// The administrator chooses the affected Band member, or explicitly selects all.
+// Always remove the reported video, plus every other Solo/Band video using a
+// targeted photo (same upload ID or SHA-256, including another user's upload).
+export async function removeReportedContent(
+  env: Env,
+  generation: GenerationRow,
+  takedownId: string,
+  memberUploadId?: string,
+) {
   const db = env.DB
-  const upload = await db.prepare('SELECT * FROM uploads WHERE id = ?').bind(generation.upload_id).first<UploadRow>()
-  let hash = upload?.sha256 ?? null
-  if (upload && !hash && !upload.expired_at) {
-    const object = await env.MEDIA.get(upload.r2_key)
-    if (object) hash = await sha256Hex(new Uint8Array(await object.arrayBuffer()))
+  const memberIds = generationPhotoIds(generation)
+  if (memberUploadId && !memberIds.includes(memberUploadId)) {
+    throw new ApiError(400, 'invalid_member', 'Selected photo does not belong to this generation')
   }
-
-  const uploadMatch = `(id = ? OR (sha256 IS NOT NULL AND sha256 = ?))`
-  const uploadParams = [generation.upload_id, hash ?? '']
+  const ids = memberUploadId ? [memberUploadId] : memberIds
+  const photoRows = await db.prepare(`SELECT * FROM uploads WHERE id IN (${ids.map(() => '?').join(',')})`)
+    .bind(...ids).all<UploadRow>()
+  // The upload row may have been deleted after a previous retention/account
+  // cleanup. The reported generation must still be removable by its ID; use
+  // SHA matching whenever a source upload row is still available.
+  const hashes: string[] = []
+  for (const photo of photoRows.results) {
+    let hash = photo.sha256
+    if (!hash && !photo.expired_at) {
+      const object = await env.MEDIA.get(photo.r2_key)
+      if (object) hash = await sha256Hex(new Uint8Array(await object.arrayBuffer()))
+    }
+    if (hash) hashes.push(hash)
+  }
+  const match = takedownMatchSql(ids, hashes)
   const [uploads, generations] = await db.batch([
-    db.prepare(`SELECT id, r2_key FROM uploads WHERE expired_at IS NULL AND ${uploadMatch}`).bind(...uploadParams),
-    db
-      .prepare(
-        `SELECT id, user_id, status, output_r2_key, share_poster_key FROM generations WHERE removed_at IS NULL
-         AND (id = ? OR upload_id IN (SELECT id FROM uploads WHERE ${uploadMatch}))`,
-      )
-      .bind(generation.id, ...uploadParams),
+    db.prepare(`SELECT id, r2_key FROM uploads WHERE expired_at IS NULL AND ${match.uploadSql}`)
+      .bind(...match.uploadParams),
+    db.prepare(`SELECT id, user_id, status, output_r2_key, share_poster_key FROM generations
+      WHERE removed_at IS NULL AND ${match.generationSql}`)
+      .bind(...match.generationParams(generation.id)),
   ])
   const uploadRows = uploads!.results as Array<{ id: string; r2_key: string }>
-  const generationRows = generations!.results as Array<Pick<GenerationRow, 'id' | 'user_id' | 'status' | 'output_r2_key' | 'share_poster_key'>>
+  const generationRows = generations!.results as Array<Pick<GenerationRow,
+    'id' | 'user_id' | 'status' | 'output_r2_key' | 'share_poster_key'>>
 
   for (const row of generationRows) {
-    if (row.status === 'queued' || row.status === 'processing') await failGeneration(env, row.id, 'content_removed', 'Removed after a takedown request')
+    if (row.status === 'queued' || row.status === 'processing') {
+      await failGeneration(env, row.id, 'content_removed', 'Removed after a takedown request')
+    }
   }
-  const keys = [
+  const keys = [...new Set([
     ...uploadRows.map((r) => r.r2_key),
-    ...generationRows.flatMap((r) => [r.output_r2_key, r.share_poster_key].filter((key): key is string => Boolean(key))),
-  ]
+    ...generationRows.flatMap((r) => [r.output_r2_key, r.share_poster_key].filter((key): key is string => !!key)),
+  ])]
   for (let i = 0; i < keys.length; i += 1000) await env.MEDIA.delete(keys.slice(i, i + 1000))
-
   const now = nowIso()
   await db.batch([
-    db
-      .prepare(
-        `UPDATE generations SET output_r2_key = NULL, share_poster_key = NULL, removed_at = ?, updated_at = ? WHERE removed_at IS NULL
-         AND (id = ? OR upload_id IN (SELECT id FROM uploads WHERE ${uploadMatch}))`,
-      )
-      .bind(now, now, generation.id, ...uploadParams),
-    db.prepare(`UPDATE uploads SET expired_at = COALESCE(expired_at, ?) WHERE ${uploadMatch}`).bind(now, ...uploadParams),
-    ...(hash
-      ? [
-          db
-            .prepare('INSERT INTO blocked_media (sha256, takedown_id, created_at) VALUES (?, ?, ?) ON CONFLICT(sha256) DO NOTHING')
-            .bind(hash, takedownId, now),
-        ]
-      : []),
+    db.prepare(`UPDATE generations SET output_r2_key = NULL, share_poster_key = NULL,
+      removed_at = ?, updated_at = ? WHERE removed_at IS NULL AND ${match.generationSql}`)
+      .bind(now, now, ...match.generationParams(generation.id)),
+    db.prepare(`UPDATE uploads SET expired_at = COALESCE(expired_at, ?) WHERE ${match.uploadSql}`)
+      .bind(now, ...match.uploadParams),
+    ...[...new Set(hashes)].map((hash) =>
+      db.prepare('INSERT INTO blocked_media (sha256, takedown_id, created_at) VALUES (?, ?, ?) ON CONFLICT(sha256) DO NOTHING')
+        .bind(hash, takedownId, now)),
   ])
-  // 按作者统计被删的视频（有成片或生成中的；早已失败或过期的不算），用于通知作者
   const owners = new Map<string, number>()
   for (const row of generationRows) {
-    if (row.output_r2_key || row.status === 'queued' || row.status === 'processing') owners.set(row.user_id, (owners.get(row.user_id) ?? 0) + 1)
+    if (row.output_r2_key || row.status === 'queued' || row.status === 'processing') {
+      owners.set(row.user_id, (owners.get(row.user_id) ?? 0) + 1)
+    }
   }
   return {
-    generations: generationRows.length,
-    uploads: uploadRows.length,
-    blocked: Boolean(hash),
+    generations: generationRows.length, uploads: uploadRows.length, blocked: hashes.length > 0,
     owners: [...owners].map(([userId, videos]) => ({ userId, videos })),
   }
 }

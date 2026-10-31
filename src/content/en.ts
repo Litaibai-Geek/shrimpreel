@@ -29,7 +29,7 @@ export function en(s: S) {
     styles,
     meta: {
       homeTitle: 'Tiny Desk AI Video Generator from a Photo',
-      homeDescription: 'Create a Tiny Desk AI video from one photo. Pick 6, 12 or 15 seconds; get an original vertical desk-session clip. No video upload required.',
+      homeDescription: 'Make a Tiny Desk AI video from one authorized adult photo in Solo or 2–5 photos in Band. Generate a vertical performance in 6, 12 or 15 seconds.',
       pricingTitle: `Pricing – ${b}`,
       pricingDescription: subs
         ? `Credit packs and monthly or yearly plans for ${k} AI videos. Pack credits never expire, cancel a plan anytime, failed renders are refunded automatically.`
@@ -66,12 +66,12 @@ export function en(s: S) {
     },
     hero: {
       title: `${k} AI Video Generator`,
-      subtitle: 'Turn one authorized portrait into a Tiny Desk-inspired AI performance. Choose 6, 12 or 15 seconds; the motion reference is supplied automatically. Learn about the Outstanding Tiny Desk AI trend below.',
+      subtitle: 'Create a desk-session AI performance with one adult portrait (Solo) or 2–5 authorized portraits (Band). Choose 6, 12 or 15 seconds; the motion reference is supplied for you.',
       badge: 'Desk-session video creator',
       original: 'Reference clip',
       aiVersion: 'Performance preview',
-      chips: ['One portrait photo', 'Reference-guided motion', '6, 12 or 15 seconds'],
-      creditNote: 'Licensed Pexels performance footage is shown for visual reference only. These are not AI-generated TinyDeskAI results; your video is generated from your own portrait.',
+      chips: ['Solo 1 / Band 2–5 people', 'Reference-guided AI performance', '6 / 12 / 15 seconds'],
+      creditNote: 'The videos above are real AI-generated demos provided by the site owner. Your results may vary with each photo and model run; no original NPR concert footage or licensed song is included.',
     },
     generator: {
       modeLabel: 'Creation mode',
@@ -154,7 +154,7 @@ export function en(s: S) {
       eyebrow: 'How it works',
       title: `How to make a ${k} AI video in 3 steps`,
       steps: [
-        { title: 'Upload one clear portrait', body: 'Use one adult subject, facing the camera, with the face and upper body visible. JPG, PNG or WebP up to 10 MB.' },
+        { title: 'Choose Solo or Band portraits', body: 'Upload one clear authorized adult photo for Solo, or 2–5 different authorized adult photos for Band. JPG, PNG or WebP up to 10 MB each.' },
         { title: 'Choose a clip length', body: 'Select a 6, 12 or 15-second option. One credit covers one second of generated video.' },
         { title: 'Generate, review and download', body: 'Start the render, then review the result for visual artifacts before downloading the MP4. Processing time depends on clip length and queue.' },
       ],
@@ -492,7 +492,7 @@ export function en(s: S) {
       title: 'Tiny Desk AI guides',
       metaTitle: 'Tiny Desk AI Video Guides – Tiny Desk AI',
       description: 'Practical guides to the Tiny Desk AI video format, choosing a portrait, selecting a clip length and reviewing an AI-generated result.',
-      intro: 'Explore the Outstanding Tiny Desk AI trend, then learn how to make an original desk-session clip from one photo, choose an output duration and review your result.',
+      intro: 'Explore the Outstanding Tiny Desk AI trend, then learn to make a Solo or Band performance, choose an output duration and review your result.',
       related: 'Related guides',
     },
     errors: {
@@ -510,6 +510,9 @@ export function en(s: S) {
       length_required: 'Your browser sent the file in a way we can’t accept. Please try again in another browser.',
       unsupported_file_type: 'Please upload a JPG, PNG or WebP image.',
       invalid_upload: 'Please upload the photo again.',
+      band_invalid: 'Band mode requires 2–5 distinct adult portraits. Please reselect your photos.',
+      band_duplicate: 'This image is repeated. Please use a different portrait for each member.',
+      band_provider_unavailable: 'Band generation is temporarily unavailable. Please try Solo or come back later.',
       invalid_style: 'That performance template is not available. Please try again later.',
       queue_unavailable: 'Our render queue is busy. Your credits were returned; please try again.',
       payment_not_configured: 'Payments are not available right now.',
@@ -544,12 +547,12 @@ export function en(s: S) {
       account_conflict: `This email is linked to a different Google account. Sign in with that account, or email ${s.supportEmail} for help.`,
     } as Record<string, string>,
     legal: {
-      updated: '2026-10-30',
+      updated: '2026-10-31',
       privacy: {
         title: 'Privacy Policy',
         sections: [
-          { h: 'What we collect', p: [`When you sign in we receive your name, email address and profile picture from Google. When you create a video we store the photo you upload and the video we generate. Payment details are handled by our payment partner; ${b} never sees your card number.`] },
-          { h: 'How we use it', p: ['Your photo is used only to render the video you request. We use your email to operate your account, send receipts and service notices (such as when your video is ready or a report you filed is resolved) and answer support requests. We do not send marketing email. We do not sell personal data and do not use your photos to train models.'] },
+          { h: 'What we collect', p: [`When you sign in we receive your name, email address and profile picture from Google. For Solo we store one uploaded portrait; for Band we store 2–5 uploaded member portraits, their role order and the generated video. Payment details are handled by our payment partner; ${b} never sees your card number.`] },
+          { h: 'How we use it', p: ['Your uploaded photos are used only to render the videos you request. We use your email to operate your account, send receipts and service notices (such as when your video is ready or a report you filed is resolved) and answer support requests. We do not send marketing email. We do not sell personal data and do not use your photos to train models.'] },
           { h: 'Storage and retention', p: [`Files are stored with our infrastructure provider in encrypted form. Uploaded photos are ${photoRetention} and generated videos are ${videoRetention}, unless you delete them or your account sooner. Order and payment records are kept as required for tax and accounting. When you delete your account we keep only a one-way hash of your email address, so the same email cannot claim the sign-up bonus twice.`] },
           { h: 'Safety checks', p: ['Before a photo is used it may be checked by an automated content-safety classifier. The check runs only to enforce our rules, and its result is not used for anything else. Public forms are protected by a bot-detection service that may process your IP address and browser signals.'] },
           {
@@ -581,14 +584,14 @@ export function en(s: S) {
                 },
               ]
             : []),
-          { h: 'Service providers', p: [`We rely on a small number of processors: cloud hosting, storage and email delivery, Kie.ai, which provides access to ByteDance's Seedance 2.0 Mini model and processes your uploaded photo plus the site's selected reference clip to render your request, a content-safety classifier, a payment provider acting as merchant of record${ga4Id || cfBeaconToken || umamiWebsiteId ? ', and the analytics services described above' : ''}.`] },
+          { h: 'Service providers', p: [`We rely on a small number of processors: cloud hosting, storage and email delivery, Kie.ai, which provides access to ByteDance's Seedance 2.0 Mini model and processes the one Solo or multiple Band portraits you upload, along with the site's selected reference clip, to render your request, a content-safety classifier, a payment provider acting as merchant of record${ga4Id || cfBeaconToken || umamiWebsiteId ? ', and the analytics services described above' : ''}.`] },
           { h: 'Your rights', p: [`You can download or delete your videos at any time. In Settings you can export a copy of your data as JSON or delete your account. For any other privacy request, email ${s.supportEmail}.`] },
         ],
       },
       terms: {
         title: 'Terms of Service',
         sections: [
-          { h: 'Using the service', p: [`${b} lets you create short AI videos from a photo. You must be at least 18 years old, or the age of majority where you live, to use it.`] },
+          { h: 'Using the service', p: [`${b} lets you create short AI videos from one authorized photo (Solo) or 2–5 authorized photos (Band). You must be at least 18 years old, or the age of majority where you live, to use it.`] },
           { h: 'Your content and consent', p: ['Only upload photos of yourself or of adults who have given you permission. Do not upload photos of minors, celebrities or public figures, and do not use the service to harass, impersonate or deceive anyone. We may remove content and close accounts that break these rules.'] },
           { h: 'Generated videos', p: ['You may use the videos you create for personal and social media purposes. AI output can contain mistakes; review a video before sharing it. Videos are labelled as AI-generated: keep that label, say the video is AI-generated when you share it and never present it as real footage of an event.'] },
           { h: 'Reports and removal', p: [`Anyone can report content through our report page. We review reports and remove content that breaks these terms or someone’s rights within ${s.takedownSlaHours} hours. Removed photos are blocked from being uploaded again, and accounts involved in serious or repeated violations may be closed without a refund of used credits.`] },
@@ -657,7 +660,7 @@ export function en(s: S) {
       howTo: {
         title: 'How to Make a Tiny Desk AI Video from a Photo',
         description: 'Sign in, upload one portrait, select 6, 12 or 15 seconds, generate an original desk-session video and download your MP4. No video upload required.',
-        intro: 'You need one clear, permitted adult portrait. The motion-reference video is built into this generator, so you choose the output duration rather than uploading a clip. The final result is an AI-created performance, not the original Outstanding concert.',
+        intro: 'Solo uses one permitted adult portrait; Band uses 2–5 different permitted adult portraits. The motion-reference video is built into the generator, so no video upload is required. These AI performances do not reproduce the original Outstanding concert.',
         sections: [
           { h: '1. Sign in, then select your photo', p: [
             'Sign in with Google to keep your uploaded photo and result in your own account. If you selected a photo before signing in, choose it again after returning; for privacy, the browser does not transfer your local file through the login redirect.',

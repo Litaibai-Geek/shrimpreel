@@ -22,7 +22,7 @@ export function zh(s: S): Content {
     styles,
     meta: {
       homeTitle: 'Tiny Desk AI 视频生成器：照片生成桌边演出短片',
-      homeDescription: '用一张照片制作 Tiny Desk AI 桌边演出短片，可选 6、12、15 秒，自动提供动作参考，无需上传视频；了解 Outstanding 热门玩法。',
+      homeDescription: 'Tiny Desk AI 支持 Solo 单人照片或 Band 2–5 人合成桌边乐队表演，可生成 6、12、15 秒竖屏短片，无需上传参考视频。',
       pricingTitle: `价格 – ${b}`,
       pricingDescription: subs
         ? `${k} AI 视频积分包与月付、年付订阅：按秒计费，积分包永不过期，订阅随时可取消；生成失败自动退还积分。`
@@ -59,12 +59,12 @@ export function zh(s: S): Content {
     },
     hero: {
       title: `${k} AI 视频生成器`,
-      subtitle: '上传一张已授权的成年人像，制作自己的 Tiny Desk 风格 AI 表演短片。选择 6、12 或 15 秒，动作参考由网站提供；下方还可以了解 Outstanding Tiny Desk AI 热门玩法。',
+      subtitle: 'Solo 使用一张成年人人像，Band 使用 2–5 张已获授权的人像制作桌边乐队风格 AI 视频。可选 6、12、15 秒，动作参考由网站提供。',
       badge: '桌边现场风格视频生成器',
       original: '参考片段',
       aiVersion: '表演预览',
-      chips: ['一张人物照片', '参考视频引导动作', '6 / 12 / 15 秒短片'],
-      creditNote: '这里展示的是 Pexels 授权表演参考素材，并非本站 AI 生成成片；实际生成视频会使用你上传的人像。',
+      chips: ['Solo 1 人 / Band 2–5 人', '演出动作自动参考', '6 / 12 / 15 秒短片'],
+      creditNote: '以上是站长提供的真实 AI 生成演示视频。实际生成效果会因照片、Solo/Band 模式及模型输出而有所不同，本站不包含 NPR 原演出视频或原版歌曲。',
     },
     generator: {
       modeLabel: '制作模式',
@@ -146,7 +146,7 @@ export function zh(s: S): Content {
       eyebrow: '使用方法',
       title: `三步制作 ${k} AI 视频`,
       steps: [
-        { title: '上传一张清晰人像', body: '使用正对镜头的成年人人像，确保面部无遮挡、上半身可见。支持 JPG、PNG、WebP，最大 10 MB。' },
+        { title: '选择 Solo 或 Band 人像', body: 'Solo 上传一张清晰的成年人人像，Band 上传 2–5 张不同且已获授权的成年人人像。支持 JPG、PNG、WebP，每张最大 10 MB。' },
         { title: '选择视频时长', body: '选择 6、12 或 15 秒。每生成 1 秒视频消耗 1 积分。' },
         { title: '生成、检查并下载', body: '提交生成任务，完成后检查画面是否有明显瑕疵，再下载 MP4。实际处理时间取决于片段时长和队列。' },
       ],
@@ -470,7 +470,7 @@ export function zh(s: S): Content {
       title: 'Tiny Desk AI 指南',
       metaTitle: 'Tiny Desk AI 视频指南 – Tiny Desk AI',
       description: '了解 Tiny Desk AI 视频的制作流程、人像照片选择、片段时长，以及生成后检查和分享时需要注意的事项。',
-      intro: '先了解 Outstanding Tiny Desk AI 的走红背景，再学习一张人像的正确制作步骤、输出时长和成片检查方法。',
+      intro: '了解 Outstanding Tiny Desk AI 的走红背景，学习 Solo 和 Band 模式的人像准备、输出时长与成片检查方法。',
       related: '相关指南',
     },
     errors: {
@@ -488,6 +488,9 @@ export function zh(s: S): Content {
       length_required: '浏览器上传文件的方式不受支持，请换个浏览器重试。',
       unsupported_file_type: '请上传 JPG、PNG 或 WebP 图片。',
       invalid_upload: '请重新上传照片。',
+      band_invalid: 'Band 模式需要 2–5 张不同成年人的照片，请重新选择。',
+      band_duplicate: '检测到重复照片，请为每位乐队成员选择不同人像。',
+      band_provider_unavailable: 'Band 多人生成暂不可用，可以尝试 Solo 或稍后再试。',
       invalid_style: '当前演出模板暂不可用，请稍后重试。',
       queue_unavailable: '生成队列繁忙，积分已退回，请重试。',
       payment_not_configured: '支付暂不可用。',
@@ -522,12 +525,12 @@ export function zh(s: S): Content {
       account_conflict: `这个邮箱已绑定另一个 Google 账号。请用那个账号登录，或发邮件至 ${s.supportEmail} 联系我们。`,
     } as Record<string, string>,
     legal: {
-      updated: '2026-10-30',
+      updated: '2026-10-31',
       privacy: {
         title: '隐私政策',
         sections: [
-          { h: '我们收集哪些信息', p: [`登录时，我们从 Google 获取你的姓名、邮箱和头像。制作视频时，我们保存你上传的照片和生成的视频。支付信息由支付合作方处理，${b} 不会接触你的卡号。`] },
-          { h: '我们如何使用', p: ['照片仅用于生成你请求的视频。邮箱用于账户运营、发送收据和服务通知（例如视频生成完成、你提交的举报已处理）以及回复客服请求。我们不发送营销邮件。我们不出售个人数据，也不会用你的照片训练模型。'] },
+          { h: '我们收集哪些信息', p: [`登录时，我们从 Google 获取你的姓名、邮箱和头像。Solo 模式保存一张上传照片；Band 模式保存 2–5 张参与者照片、角色顺序和生成视频。支付信息由支付合作方处理，${b} 不会接触你的卡号。`] },
+          { h: '我们如何使用', p: ['上传的照片仅用于生成你请求的视频。邮箱用于账户运营、发送收据和服务通知（例如视频生成完成、你提交的举报已处理）以及回复客服请求。我们不发送营销邮件。我们不出售个人数据，也不会用你的照片训练模型。'] },
           { h: '存储与保留', p: [`文件加密存储在我们的基础设施服务商处。上传的照片${photoRetention}，生成的视频${videoRetention}；你也可以提前删除它们或注销账号。订单与支付记录按税务和财务要求保留。注销账号后，我们只保留邮箱地址的单向哈希，用于防止同一邮箱重复领取注册赠送。`] },
           { h: '安全检查', p: ['照片在使用前可能经过自动内容安全分类器检查，结果只用于执行内容规则，不作他用。公开表单使用防机器人服务保护，该服务可能处理你的 IP 地址和浏览器信号。'] },
           {
@@ -559,14 +562,14 @@ export function zh(s: S): Content {
                 },
               ]
             : []),
-          { h: '服务提供方', p: [`我们只使用少量数据处理方：云托管、存储与邮件发送、提供 ByteDance Seedance 2.0 Mini 接口的 Kie.ai（会处理你上传的人像照片和本站选用的参考视频，以完成生成请求）、内容安全分类服务，以及作为记录商户（Merchant of Record）的支付服务${ga4Id || cfBeaconToken || umamiWebsiteId ? '；另有上文所述的统计服务' : ''}。`] },
+          { h: '服务提供方', p: [`我们只使用少量数据处理方：云托管、存储与邮件发送、提供 ByteDance Seedance 2.0 Mini 接口的 Kie.ai（会处理 Solo 的单张或 Band 的多张上传人像照片以及本站的参考视频，以完成生成请求）、内容安全分类服务，以及作为记录商户（Merchant of Record）的支付服务${ga4Id || cfBeaconToken || umamiWebsiteId ? '；另有上文所述的统计服务' : ''}。`] },
           { h: '你的权利', p: [`你可以随时下载或删除视频，也可以在“设置”中导出个人数据（JSON）或注销账号。其他隐私请求请发送邮件至 ${s.supportEmail}。`] },
         ],
       },
       terms: {
         title: '服务条款',
         sections: [
-          { h: '使用服务', p: [`${b} 让你通过一张照片制作 AI 短视频。你必须年满 18 周岁（或所在地法定成年年龄）才能使用。`] },
+          { h: '使用服务', p: [`${b} 让你通过 Solo 单张照片或 Band 多张照片制作 AI 短视频。你必须年满 18 周岁（或所在地法定成年年龄）才能使用。`] },
           { h: '内容与授权', p: ['只能上传你本人或已获得许可的成年人的照片。禁止上传未成年人、明星或公众人物的照片，禁止利用本服务骚扰、冒充或欺骗他人。我们有权删除违规内容并关闭相关账号。'] },
           { h: '生成的视频', p: ['你可以将生成的视频用于个人和社交媒体用途。AI 输出可能存在瑕疵，分享前请先检查。视频带有“AI 生成”标识：分享时请保留标识并注明为 AI 生成，不得冒充真实事件的录像。'] },
           { h: '举报与下架', p: [`任何人都可以通过举报页面提交举报。我们会在 ${s.takedownSlaHours} 小时内审核，并下架违反本条款或侵犯他人权利的内容；被下架的照片将无法再次上传。严重或多次违规的账号可能被关闭，已使用的积分不予退还。`] },
@@ -635,7 +638,7 @@ export function zh(s: S): Content {
       howTo: {
         title: '如何用一张照片制作 Tiny Desk AI 视频',
         description: 'Google 登录后上传一张人像，选择 6、12 或 15 秒，生成并下载 MP4。无需用户上传参考视频，并解释积分与成片限制。',
-        intro: '准备一张清晰、已经获得授权的成年人人像即可。本站自动提供动作参考片段；你选择的是输出时长，而不是上传或挑选自己的视频。成片是 AI 创作，不是 Outstanding 原演出的复刻。',
+        intro: 'Solo 使用一张清晰、已授权的成年人人像；Band 使用 2–5 张不同成年人的授权照片。系统自动提供动作参考，无需上传参考视频。成片是 AI 创作，不是 Outstanding 原演出的复刻。',
         sections: [
           { h: '1. 登录后选择人物照片', p: [
             '建议先使用 Google 登录，以便把上传和结果保存到自己的账户。如果你在登录前选择过本地照片，登录返回后需要重新选择；浏览器不会通过登录跳转传递本地文件。',

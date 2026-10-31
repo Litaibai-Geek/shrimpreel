@@ -54,10 +54,10 @@ export const site = {
       // yir 两步走（可选）：先用图片模型把照片里的人合成进源视频首帧，再拿合成图做动作参考，成片保留源视频的场景。
       // null = 单步，直接用用户照片做参考，背景会变成照片的背景。图片模型等共用参数在 video.yir.sceneImage
       scene: null as StyleScene | null,
-      // 首页展示 Pexels 授权的表演参考片段；明确标注为 stock footage，不冒充本站 AI 生成结果。
+      // 首页展示站长替换的真实 AI 生成样片；旧文件名保留。R2 的参考视频是另一份素材。
       examples: {
         previews: [demoMedia.band, demoMedia.singer, demoMedia.sax],
-        // 真正的“上传照片 → AI 成片”案例，等 Kie 真实生成测试通过后再补。
+        // 输入照片 → AI 成片对比需取得对应原图与公开展示许可，不能用不相关图片充当输入图。
         madeWith: { photo: '', video: '', poster: '' },
       },
     },

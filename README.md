@@ -39,12 +39,11 @@ Release notes: [CHANGELOG.md](CHANGELOG.md). Feature notes and plans: [docs/SAAS
 
 ## Demo media
 
-The homepage shows three licensed Pexels performance-reference clips (band, singer close-up, sax solo). They are explicitly labelled as stock reference footage, not as AI-generated TinyDeskAI results. The actual photo-to-AI-result comparison stays hidden until a real Kie output has been tested.
+The homepage MP4 previews in `public/demo/` were replaced by the site owner with real AI-generated demos. `src/config/demo-media.ts` reflects the current labels. The existing file paths are retained so previous video assets do not need to be renamed. Do not overwrite these demos by running the original stock downloader.
 
-- The initial config uses Pexels CDN URLs so previews are visible immediately. The downloader also prepares 6 / 12 / 15-second duration-matched template clips for fal / yir / NanoAPI, a fixed 14-second reference for Kie, and the legacy 18-second source.
-- Run `npm run media:download` on a machine with Node 24+ and FFmpeg on `PATH` to download the previews into `public/demo/`, generate duration-matched 6 / 12 / 15-second clips for fal / yir / NanoAPI, a fixed 14-second 720p reference clip for Kie, and the legacy 18-second clip in `seed/templates/`, then switch `src/config/demo-media.ts` to local paths.
-- Then run `npm run seed:local` for local R2. For production R2, upload the generated MP4s using the Wrangler commands in `docs/media/pexels-demo-media-credits.md`.
-- Competitor demo URLs are listed in `docs/media/competitor-video-research.md` for private comparison only; they are not copied into this site.
+The 14-second R2 motion-reference video (`templates/tiny-desk-v1-reference-14s.mp4`) is a **separate** input. Historical Pexels credits in `docs/media/` concern the old source/reference materials, not the new public demos. Verify the R2 reference video, its rights and the real Kie outputs separately.
+
+The optional photo-to-result pair in `site.styles[].examples.madeWith` is intentionally hidden until a correctly matched, authorized original portrait is provided. Do not invent an input photo to show before/after results.
 
 ## Local development
 

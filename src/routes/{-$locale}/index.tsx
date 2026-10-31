@@ -43,7 +43,7 @@ function Home() {
   const styleCopy = (id: string) => c.styles[id as keyof typeof c.styles]
   return (
     <>
-      {/* Hero：左侧生成器，右侧展示三段有授权的表演参考素材 */}
+      {/* Hero：左侧生成器，右侧展示站长提供的真实 AI 生成视频 */}
       <section className="relative overflow-hidden">
         <div className="hero-glow pointer-events-none absolute inset-0" aria-hidden />
         <div className="container-page relative grid gap-y-5 py-10 lg:grid-cols-[minmax(0,430px)_minmax(0,1fr)] lg:gap-x-16 lg:gap-y-5 lg:py-14">
