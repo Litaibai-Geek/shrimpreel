@@ -43,21 +43,62 @@ function Home() {
   const styleCopy = (id: string) => c.styles[id as keyof typeof c.styles]
   return (
     <>
-      {/* Hero：左侧生成器，右侧展示三段有授权的表演参考素材 */}
-      <section className="relative overflow-hidden">
-        <div className="hero-glow pointer-events-none absolute inset-0" aria-hidden />
-        <div className="container-page relative grid gap-10 py-10 lg:grid-cols-[minmax(0,430px)_1fr] lg:gap-16 lg:py-14">
-          <div className="space-y-5" id="create">
-            <h1 className="font-display text-5xl leading-[1.04] tracking-tight sm:text-6xl">{c.hero.title}</h1>
-            <p className="text-lg leading-8 text-muted">{c.hero.subtitle}</p>
-            <Generator styleId={style.id} onStyleChange={setStyleId} />
-          </div>
-          <div className="flex flex-col justify-center gap-5">
-            <span className="chip w-fit">
-              <Flame className="size-4 text-accent" /> {c.hero.badge}
+      {/* Hero：先展示 Tiny Desk 演出氛围，再引导用户开始创作 */}
+      <section className="relative isolate overflow-hidden bg-[#17130f] text-[#fff8ef]">
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(circle at 78% 18%, rgba(227, 166, 91, 0.22), transparent 36%), radial-gradient(circle at 8% 88%, rgba(183, 72, 72, 0.18), transparent 34%)',
+          }}
+          aria-hidden
+        />
+        <div className="pointer-events-none absolute -right-24 -top-36 size-[30rem] rounded-full border border-white/10" aria-hidden />
+        <div className="container-page relative grid items-center gap-10 py-14 sm:py-20 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-14">
+          <div className="space-y-7">
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold tracking-wide text-white/85">
+              <Flame className="size-4 text-[#f0b765]" /> {c.hero.badge}
             </span>
+            <h1 className="max-w-xl font-display text-5xl leading-[1.04] tracking-tight sm:text-6xl xl:text-7xl">
+              {c.hero.title}
+            </h1>
+            <p className="max-w-xl text-base leading-8 text-white/70 sm:text-lg">{c.hero.subtitle}</p>
+            <div className="flex flex-wrap gap-3">
+              <a
+                href="#create"
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-[#f0b765] px-6 py-3.5 text-sm font-bold text-[#211811] shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:bg-[#ffd18a]"
+              >
+                <Camera className="size-4" /> {c.generator.title}
+              </a>
+              <a
+                href="#examples"
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-white/20 bg-white/5 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-white/10"
+              >
+                {c.nav.examples} <ArrowRight className="size-4" />
+              </a>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {c.hero.chips.map((chip) => (
+                <span key={chip} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/75">
+                  <Check className="size-3.5 text-[#f0b765]" /> {chip}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div id="examples" className="scroll-mt-24">
+            <div className="mb-5 flex items-end justify-between gap-4">
+              <div>
+                <p className="eyebrow text-[#f0b765]">{c.hero.aiVersion}</p>
+                <p className="mt-1 text-sm text-white/55">{c.hero.original}</p>
+              </div>
+              <span className="rounded-full border border-white/15 px-3 py-1.5 text-[10px] font-semibold tracking-[0.18em] text-white/65">
+                VISUAL REFERENCES
+              </span>
+            </div>
+
             {STYLES.length > 1 ? (
-              <div role="tablist" aria-label={c.generator.stepStyle} className="flex flex-wrap gap-2">
+              <div role="tablist" aria-label={c.generator.stepStyle} className="mb-4 flex flex-wrap gap-2">
                 {STYLES.map((s) => {
                   const active = s.id === style.id
                   return (
@@ -65,22 +106,24 @@ function Home() {
                       key={s.id}
                       type="button"
                       role="tab"
-                      id={`hero-tab-${s.id}`}
+                      id={'hero-tab-' + s.id}
                       aria-selected={active}
                       aria-controls="hero-panel"
                       tabIndex={active ? 0 : -1}
-                      data-testid={`hero-tab-${s.id}`}
+                      data-testid={'hero-tab-' + s.id}
                       onClick={() => setStyleId(s.id)}
                       onKeyDown={(event) => {
-                        // 左右方向键在标签间移动并选中
                         const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
                         if (!step) return
                         event.preventDefault()
                         const next = STYLES[(STYLES.indexOf(s) + step + STYLES.length) % STYLES.length]!
                         setStyleId(next.id)
-                        document.getElementById(`hero-tab-${next.id}`)?.focus()
+                        document.getElementById('hero-tab-' + next.id)?.focus()
                       }}
-                      className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${active ? 'bg-ink text-ink-fg' : 'bg-bg-soft text-muted ring-1 ring-line hover:text-fg'}`}
+                      className={
+                        'rounded-full px-4 py-1.5 text-sm font-semibold transition ' +
+                        (active ? 'bg-[#f0b765] text-[#211811]' : 'bg-white/5 text-white/65 ring-1 ring-white/15 hover:text-white')
+                      }
                     >
                       {styleCopy(s.id).name}
                     </button>
@@ -88,49 +131,69 @@ function Home() {
                 })}
               </div>
             ) : null}
+
             <div
-              className="grid grid-cols-3 gap-3 sm:gap-4"
-              {...(STYLES.length > 1 ? { id: 'hero-panel', role: 'tabpanel', 'aria-labelledby': `hero-tab-${style.id}` } : {})}
+              className="grid grid-cols-3 items-start gap-2.5 sm:gap-4"
+              {...(STYLES.length > 1
+                ? { id: 'hero-panel', role: 'tabpanel', 'aria-labelledby': 'hero-tab-' + style.id }
+                : {})}
             >
               {heroClips.length ? (
                 heroClips.map((clip, index) => (
                   <VideoCard
-                    key={`${style.id}-example-${index}`}
+                    key={style.id + '-example-' + index}
                     video={clip.video}
                     poster={clip.poster}
                     credit={clip.credit}
                     label={clip.label}
+                    className={
+                      'min-w-0 ' +
+                      (index === 1 ? 'mt-8 sm:mt-12' : index === 2 ? 'mt-4 sm:mt-6' : '') +
+                      ' [&>div]:rounded-xl [&>div]:ring-white/10 [&>figcaption]:text-white/55'
+                    }
                   />
                 ))
               ) : (
                 [c.hero.original, c.hero.aiVersion, c.hero.aiVersion].map((label, index) => (
-                  <figure key={`empty-example-${index}`}>
-                    <div className="relative aspect-[9/16] overflow-hidden rounded-2xl bg-bg-soft ring-1 ring-line">
+                  <figure key={'empty-example-' + index} className="min-w-0">
+                    <div className="relative aspect-[9/16] overflow-hidden rounded-xl bg-white/10 ring-1 ring-white/10">
                       <div className="absolute inset-0 grid place-items-center">
-                        <Film className="size-7 text-muted/60" aria-hidden />
+                        <Film className="size-7 text-white/40" aria-hidden />
                       </div>
                     </div>
-                    <figcaption className="mt-2 truncate text-center text-xs text-muted">{label}</figcaption>
+                    <figcaption className="mt-2 truncate text-center text-xs text-white/55">{label}</figcaption>
                   </figure>
                 ))
               )}
             </div>
-            <div className="flex flex-wrap justify-center gap-2">
-              {c.hero.chips.map((chip) => (
-                <span key={chip} className="chip">
-                  {chip}
-                </span>
+            <p className="mt-4 max-w-xl text-xs leading-5 text-white/55">{c.hero.creditNote}</p>
+          </div>
+        </div>
+      </section>
+
+      {/* 创作区：把上传入口和时长选择放在首屏之后，减少用户寻找操作入口的成本 */}
+      <section id="create" className="scroll-mt-20 border-b border-line bg-bg-soft/55 py-16 sm:py-20">
+        <div className="container-page grid items-start gap-10 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] lg:gap-16">
+          <div className="space-y-6 lg:pt-5">
+            <p className="eyebrow text-accent-text">{c.generator.title}</p>
+            <h2 className="font-display text-4xl leading-tight sm:text-5xl">{c.madeWith.title}</h2>
+            <p className="text-lg leading-8 text-muted">{c.madeWith.body}</p>
+            <div className="grid grid-cols-3 gap-2">
+              {site.durations.map((duration) => (
+                <div key={duration.id} className="rounded-2xl border border-line bg-card p-3 sm:p-4">
+                  <span className="block font-display text-2xl sm:text-3xl">{c.generator.seconds(duration.seconds)}</span>
+                  <span className="mt-1 block text-xs text-muted">{c.generator.creditsLabel(duration.credits)}</span>
+                </div>
               ))}
             </div>
-            <p className="text-center text-xs text-muted">{c.hero.creditNote}</p>
-            <div className="flex flex-wrap justify-center gap-x-8 gap-y-2 text-sm font-medium">
-              <LocalLink to={articlePath('trend')} className="inline-flex items-center gap-1.5 hover:text-accent">
-                {c.articles.trend.title} <ArrowRight className="size-4" />
-              </LocalLink>
-              <LocalLink to={articlePath('howTo')} className="inline-flex items-center gap-1.5 hover:text-accent">
-                {c.articles.howTo.title} <ArrowRight className="size-4" />
-              </LocalLink>
+            <div className="flex flex-wrap gap-2">
+              {c.hero.chips.map((chip) => (
+                <span key={'create-' + chip} className="chip text-xs">{chip}</span>
+              ))}
             </div>
+          </div>
+          <div className="w-full max-w-2xl lg:max-w-none">
+            <Generator styleId={style.id} onStyleChange={setStyleId} />
           </div>
         </div>
       </section>
@@ -218,7 +281,7 @@ function Home() {
 
       {/* Made with：有真实示例素材后再显示照片 → 成片区块 */}
       {hasMadeWithExamples ? (
-        <section id="examples" className="scroll-mt-20 border-t border-line bg-bg-soft/60 py-20">
+        <section id="photo-to-video" className="scroll-mt-20 border-t border-line bg-bg-soft/60 py-20">
           <div className="container-page grid items-center gap-12 lg:grid-cols-[1fr_1.1fr]">
             <div className="space-y-4">
               <p className="eyebrow text-accent-text">{c.madeWith.eyebrow}</p>
