@@ -59,7 +59,7 @@ export async function storeOutputFromUrl(
   await env.MEDIA.put(key, bytes, { httpMetadata })
   return true
 }
-const POLL_DELAY_SECONDS: Record<string, number> = { mock: 2, fal: 20, yir: 20, nanoapi: 30 }
+const POLL_DELAY_SECONDS: Record<string, number> = { mock: 2, fal: 20, yir: 20, nanoapi: 30, kie: 20 }
 
 export async function enqueueJob(env: Env, message: VideoJobMessage, delaySeconds = 0) {
   await env.VIDEO_QUEUE.send(message, delaySeconds > 0 ? { delaySeconds } : undefined)
@@ -117,7 +117,12 @@ async function submitGeneration(env: Env, generation: GenerationRow) {
 
   const duration = findDuration(generation.duration_id)
   const style = findStyle(generation.template_id)
-  const sourceFile = duration ? style?.sources[duration.id] : undefined
+  // 已排队的旧 full 任务仍可能是 18 秒；新 full 档位改为 15 秒，保留旧素材映射以免误用 15 秒片段。
+  const sourceFile = duration
+    ? generation.duration_seconds > duration.seconds
+      ? style?.sources.legacyFull
+      : style?.sources[duration.id]
+    : undefined
   const upload = await env.DB.prepare('SELECT * FROM uploads WHERE id = ?').bind(generation.upload_id).first<UploadRow>()
   if (!duration || !style || !sourceFile || !upload || upload.expired_at) {
     await failGeneration(env, generation.id, 'invalid_input', 'Upload, style or duration no longer exists')
@@ -128,6 +133,7 @@ async function submitGeneration(env: Env, generation: GenerationRow) {
   const baseMeta = parseMeta(generation.provider_meta)
 
   // 签名在 try 里：生产环境 SESSION_SECRET 配错时会抛错，要和提交失败一样放回 queued，交给队列重试和死信退款
+  let providerRequestId: string | null = null
   try {
     const webhookUrl = new URL(`/api/webhooks/${provider.id}`, env.SITE_URL)
     webhookUrl.searchParams.set('gen', generation.id)
@@ -143,6 +149,7 @@ async function submitGeneration(env: Env, generation: GenerationRow) {
       webhookUrl: webhookUrl.toString(),
       meta: baseMeta,
     })
+    providerRequestId = result.requestId
     const now = nowIso()
     await env.DB.prepare(
       `UPDATE generations SET provider_request_id = ?, provider_meta = ?, started_at = ?, updated_at = ? WHERE id = ?`,
@@ -151,6 +158,25 @@ async function submitGeneration(env: Env, generation: GenerationRow) {
       .run()
     await enqueueJob(env, { kind: 'poll', generationId: generation.id }, POLL_DELAY_SECONDS[provider.id])
   } catch (error) {
+    if (provider.id === 'kie' && providerRequestId) {
+      // The upstream task exists; if saving its id or queueing the first poll failed, persist the id
+      // and let scheduled maintenance resume polling instead of creating a second billable task.
+      await env.DB.prepare(
+        `UPDATE generations SET status = 'processing', provider_request_id = ?, updated_at = ?
+         WHERE id = ? AND status IN ('queued', 'processing')`,
+      )
+        .bind(providerRequestId, nowIso(), generation.id)
+        .run()
+      return
+    }
+    if (error instanceof VideoProviderError && error.uncertain) {
+      // Kie does not document an idempotency key. A submit network/5xx ambiguity may mean it created
+      // a billable task; keep processing so the signed callback can restore provider_request_id.
+      await env.DB.prepare(`UPDATE generations SET updated_at = ? WHERE id = ? AND status = 'processing'`)
+        .bind(nowIso(), generation.id)
+        .run()
+      return
+    }
     if (error instanceof VideoProviderError && !error.retryable) {
       await failGeneration(env, generation.id, error.code, error.message)
       return
@@ -288,6 +314,13 @@ export async function runScheduledMaintenance(env: Env) {
       await enqueueJob(env, { kind: 'submit', generationId: generation.id })
     } else if (generation.provider_request_id) {
       await enqueueJob(env, { kind: 'poll', generationId: generation.id })
+    } else if (generation.provider === 'kie') {
+      // Ambiguous Kie submit: never submit a second task without an idempotency key.
+      // Wait for the signed callback to supply taskId; the normal 45-minute timeout refunds if it never arrives.
+      await db
+        .prepare(`UPDATE generations SET updated_at = ? WHERE id = ? AND status = 'processing' AND provider_request_id IS NULL`)
+        .bind(nowIso(), generation.id)
+        .run()
     } else if (generation.attempts < 3) {
       // 抢占后、拿到 request id 前 Worker 中断：放回队列重新提交
       await db

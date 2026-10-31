@@ -13,13 +13,14 @@ describe('site.styles', () => {
     expect(findStyle('no-such-style')).toBeUndefined()
   })
 
-  it('每个风格的 sources 覆盖所有时长档位，文件名不重复', () => {
+  it('每个风格的 sources 覆盖所有时长档位，文件名不重复，并保留旧 18 秒 full 源片', () => {
     const files: string[] = []
     for (const style of STYLES) {
       for (const d of site.durations) {
         expect(style.sources[d.id], `${style.id} 缺 ${d.id} 的源视频`).toBeTruthy()
         files.push(style.sources[d.id]!)
       }
+      expect(style.sources.legacyFull, `${style.id} 缺旧 18 秒任务的兼容源视频`).toBeTruthy()
     }
     expect(new Set(files).size).toBe(files.length)
   })

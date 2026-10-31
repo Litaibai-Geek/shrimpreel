@@ -29,7 +29,7 @@ export function en(s: S) {
     styles,
     meta: {
       homeTitle: 'Tiny Desk AI Video Generator from a Photo',
-      homeDescription: 'Create a Tiny Desk AI video from a photo. Upload a portrait, choose a 6, 12 or 18-second reference clip, and make a vertical performance-style video.',
+      homeDescription: 'Create a Tiny Desk AI video from a photo. Upload a portrait, choose a 6, 12 or 15-second reference clip, and make a vertical performance-style video.',
       pricingTitle: `Pricing – ${b}`,
       pricingDescription: subs
         ? `Credit packs and monthly or yearly plans for ${k} AI videos. Pack credits never expire, cancel a plan anytime, failed renders are refunded automatically.`
@@ -70,7 +70,7 @@ export function en(s: S) {
       badge: 'Desk-session video creator',
       original: 'Reference clip',
       aiVersion: 'AI preview',
-      chips: ['One portrait photo', 'Reference-guided motion', '6, 12 or 18 seconds'],
+      chips: ['One portrait photo', 'Reference-guided motion', '6, 12 or 15 seconds'],
       creditNote: 'Example video slots are intentionally empty until model testing is complete and original or licensed clips are ready.',
     },
     generator: {
@@ -79,7 +79,7 @@ export function en(s: S) {
       stepPhoto: 'Your portrait',
       dropTitle: 'Drop a photo or click to upload',
       dropHint: 'JPG, PNG or WebP · up to 10 MB',
-      guidance: 'For the clearest result, use a sharp photo of one adult facing the camera, with the face unobstructed and the upper body visible. Avoid group photos, sunglasses, masks and heavy filters.',
+      guidance: 'For the clearest result, use a sharp photo of one adult facing the camera, with the face unobstructed and the upper body visible. Avoid group photos, sunglasses, masks and heavy filters. No video upload is needed; the performance reference clip is provided automatically.',
       change: 'Change photo',
       uploading: 'Uploading…',
       uploaded: 'Photo ready',
@@ -142,7 +142,7 @@ export function en(s: S) {
       title: `How to make a ${k} AI video in 3 steps`,
       steps: [
         { title: 'Upload one clear portrait', body: 'Use one adult subject, facing the camera, with the face and upper body visible. JPG, PNG or WebP up to 10 MB.' },
-        { title: 'Choose a clip length', body: 'Select a 6, 12 or 18-second option. One credit covers one second of generated video.' },
+        { title: 'Choose a clip length', body: 'Select a 6, 12 or 15-second option. One credit covers one second of generated video.' },
         { title: 'Generate, review and download', body: 'Start the render, then review the result for visual artifacts before downloading the MP4. Processing time depends on clip length and queue.' },
       ],
       cta: 'Start with your portrait',
@@ -164,7 +164,7 @@ export function en(s: S) {
         { title: 'One portrait to start', body: 'Use a clear photo of one consenting adult as the visual reference for your clip.' },
         { title: 'Reference-guided movement', body: 'The source performance guides the motion and framing of the generated desk-session scene.' },
         { title: 'Vertical video format', body: `The output uses ${s.template.aspectRatio} framing for a compact, social-ready Tiny Desk-style AI video.` },
-        { title: 'Three clip lengths', body: 'Choose 6, 12 or 18 seconds and pay according to the generated duration.' },
+        { title: 'Three clip lengths', body: 'Choose 6, 12 or 15 seconds and pay according to the generated duration.' },
         { title: 'Private by default', body: `Uploads are stored privately, used only for your render and ${photoRetention}.` },
         { title: 'Clear credit rules', body: 'Credit packs are one-time purchases and never expire. If a render fails, the credits are returned automatically.' },
       ],
@@ -197,7 +197,7 @@ export function en(s: S) {
       credits: (n: number) => `${n} credits`,
       makes: (items: { videos: number; seconds: number }[]) =>
         `Makes ${items.map((i) => `${i.videos} × ${i.seconds}s`).join(' or ')} ${items.length === 1 && items[0]!.videos === 1 ? 'video' : 'videos'}`,
-      bullets: ['Credits never expire', '6, 12 or 18-second clips', 'MP4 download', 'Automatic refund on failed renders'],
+      bullets: ['Credits never expire', '6, 12 or 15-second clips', 'MP4 download', 'Automatic refund on failed renders'],
       note: 'Prices in USD. Taxes are calculated at checkout by our payment partner.',
       // 价格页底部的教程链接
       guide: 'Before you create: Tiny Desk AI photo and clip tips',
@@ -566,7 +566,7 @@ export function en(s: S) {
                 },
               ]
             : []),
-          { h: 'Service providers', p: [`We rely on a small number of processors: cloud hosting, storage and email delivery, an AI rendering provider that processes your photo only for your request, a content-safety classifier, a payment provider acting as merchant of record${ga4Id || cfBeaconToken || umamiWebsiteId ? ', and the analytics services described above' : ''}.`] },
+          { h: 'Service providers', p: [`We rely on a small number of processors: cloud hosting, storage and email delivery, Kie.ai, which provides access to ByteDance's Seedance 2.0 Mini model and processes your uploaded photo plus the site's selected reference clip to render your request, a content-safety classifier, a payment provider acting as merchant of record${ga4Id || cfBeaconToken || umamiWebsiteId ? ', and the analytics services described above' : ''}.`] },
           { h: 'Your rights', p: [`You can download or delete your videos at any time. In Settings you can export a copy of your data as JSON or delete your account. For any other privacy request, email ${s.supportEmail}.`] },
         ],
       },
@@ -620,7 +620,7 @@ export function en(s: S) {
           { h: 'What the desk-session look means', p: ['The visual idea is intimate rather than arena-sized: a performer stays close to the camera in a compact room or desk-side setup. A microphone, instrument or simple background may help establish the scene when those elements are present in the reference footage.', 'The phrase “Tiny Desk AI” describes the creative style users are looking to make here. It should not be confused with an official program, a real concert recording or an endorsement by any broadcaster, artist or venue.'] },
           { h: 'How a portrait becomes an AI performance clip', p: ['The workflow starts with two visual ingredients: a portrait of the person to feature and a reference performance clip. The reference provides movement and framing cues; the portrait provides the visual identity for the generated subject.', 'The model creates a new video rather than documenting a real performance. Results can vary across frames, especially around hands, instruments, clothing and fine facial details. Always review the full clip before posting it.'] },
           { h: 'What to prepare before you generate', p: ['Choose a sharp, front-facing photo of one adult. Keep the face unobstructed and include enough of the upper body for the scene. Group photos, sunglasses, masks and strong filters make it harder to produce a coherent result.', 'Only upload your own photo or an adult’s photo when you have their permission. Do not use images of minors, celebrities or public figures. Use source footage and any music or other creative material only when you have the rights or permission to do so.'] },
-          { h: 'Create a Tiny Desk AI video with a portrait', p: [`On ${b}, upload a portrait, choose a 6, 12 or 18-second clip length and start the render. When processing is complete, watch the result from beginning to end, check for visual artifacts and download the MP4 if it is ready to share.`, 'When posting, describe the clip as AI-generated. Do not present it as a real live session or imply that the person, broadcaster, venue or rights holder endorsed it.'] },
+          { h: 'Create a Tiny Desk AI video with a portrait', p: [`On ${b}, upload a portrait, choose a 6, 12 or 15-second clip length and start the render. When processing is complete, watch the result from beginning to end, check for visual artifacts and download the MP4 if it is ready to share.`, 'When posting, describe the clip as AI-generated. Do not present it as a real live session or imply that the person, broadcaster, venue or rights holder endorsed it.'] },
         ],
       },
       howTo: {
@@ -629,7 +629,7 @@ export function en(s: S) {
         intro: 'Prepare a Tiny Desk AI video in a few clear steps. The quality of the source portrait and reference clip matters, and every generated result should be reviewed before sharing.',
         sections: [
           { h: '1. Choose a clear portrait', p: ['Use a recent, sharp photo of one adult looking toward the camera. Even lighting, a visible face and an unobstructed upper body give the model more useful visual information.', 'Avoid group shots, sunglasses, masks, extreme angles and heavy beauty filters. Do not upload another person’s image unless they have explicitly agreed to this use.'] },
-          { h: '2. Select a reference clip length', p: ['Choose the 6, 12 or 18-second option that fits the moment you want to create. Shorter clips use fewer credits; one credit covers one second of generated video.', 'The reference clip guides the movement and framing. It is a visual guide for the AI output, not proof that the generated video records a real performance.'] },
+          { h: '2. Select a reference clip length', p: ['Choose the 6, 12 or 15-second option that fits the moment you want to create. Shorter clips use fewer credits; one credit covers one second of generated video.', 'The reference clip guides the movement and framing. It is a visual guide for the AI output, not proof that the generated video records a real performance.'] },
           { h: '3. Generate and review the result', p: ['Sign in, upload your portrait and confirm that you have the right to use the image. Start the render and wait for the job to finish. Processing time depends on the selected length, model availability and queue.', 'Watch the complete MP4 before sharing. Check the face, hands, clothing, microphone and instruments for visual changes or artifacts.'] },
           { h: '4. Download and share responsibly', p: ['Download the finished MP4 from the generator or My videos. Keep the AI-generated disclosure when you post it and do not describe it as real concert footage.', 'Use only photos, reference clips, music and other materials that you own or are authorized to use. Respect the consent of the person shown and the rights of creators whose work appears in any source material.'] },
         ],

@@ -29,7 +29,7 @@ export const site = {
   // 生成模板的共用参数：provider 输出时长 = 源视频时长，所以每种风格的每个时长档位各有一段剪好的源视频（见 styles[].sources）。
   template: {
     aspectRatio: '9:16',
-    fullSeconds: 18,
+    fullSeconds: 15,
   },
 
   // 表演场景：一个站点可以配置多种，第一个是默认场景；只有一种时界面不显示场景选择。
@@ -41,8 +41,8 @@ export const site = {
       id: 'tiny-desk-v1',
       // 键 = durations[].id，每个档位都要有
       // TODO(site): add original or licensed desk-session reference clips before production; these files are not in the repo yet.
-      sources: { short: 'tiny-desk-v1-6s.mp4', medium: 'tiny-desk-v1-12s.mp4', full: 'tiny-desk-v1-18s.mp4' },
-      // 这种风格的 prompt，覆盖 video.yir.prompt 和 video.nanoapi.prompt；null = 用默认
+      sources: { short: 'tiny-desk-v1-6s.mp4', medium: 'tiny-desk-v1-12s.mp4', full: 'tiny-desk-v1-15s.mp4', legacyFull: 'tiny-desk-v1-18s.mp4' },
+      // 这种风格的 prompt，覆盖 video.yir.prompt、video.nanoapi.prompt 和 video.kie.prompt；null = 用默认
       prompt: null as string | null,
       // yir 两步走（可选）：先用图片模型把照片里的人合成进源视频首帧，再拿合成图做动作参考，成片保留源视频的场景。
       // null = 单步，直接用用户照片做参考，背景会变成照片的背景。图片模型等共用参数在 video.yir.sceneImage
@@ -104,12 +104,24 @@ export const site = {
       // genjutsu-1.0：480p $0.117/s、720p $0.273/s、1080p $0.78/s。motion_control 计费秒数 = 源视频秒数四舍五入、至少 4 秒；replace_object 向上取整
       costCentsPerSecond: 11.7,
     },
+    // Kie.ai Seedance 2.0 Mini：人像照片 + R2 内置动作参考视频，多模态 reference-to-video。
+    // 720p 带视频参考的当前公开单价为 5 credits / (输入视频秒 + 输出视频秒)；1 credit = $0.005。
+    // 模板输入视频和输出时长相同，因此估算成本约 $0.05 / 输出秒；以任务返回的 creditsConsumed 记录实际成本。
+    kie: {
+      model: 'bytedance/seedance-2-mini',
+      resolution: '720p',
+      aspectRatio: '9:16',
+      generateAudio: true,
+      usdPerCredit: 0.005,
+      estimatedCreditsPerBillableSecond: 5,
+      prompt: 'Use Image 1 as the identity reference for the main performer. Recreate the movements, choreography, gestures, timing, camera framing, and scene from Video 1. Replace the original performer in Video 1 with the person from Image 1 while preserving the reference video’s setting, background, lighting, camera movement, and overall composition. Keep the person’s face and identity consistent throughout. Do not add extra people or change the scene.',
+    },
   },
 
   durations: [
     { id: 'short', seconds: 6, credits: 6 },
     { id: 'medium', seconds: 12, credits: 12 },
-    { id: 'full', seconds: 18, credits: 18, isFull: true },
+    { id: 'full', seconds: 15, credits: 15, isFull: true },
   ],
 
   // 积分包：一次性购买，买的积分永不过期（赠送积分可以设有效期，扣费时先扣快到期的）。价格用于展示与订单记录，实际收费以支付商后台为准。
@@ -239,7 +251,7 @@ export interface ExampleClip {
 
 export interface Style {
   id: string
-  sources: Readonly<Record<DurationOption['id'], string>> // 键 = durations[].id，值 = seed/templates/ 里的文件名
+  sources: Readonly<Record<DurationOption['id'], string> & { legacyFull?: string }> // 键 = durations[].id；legacyFull 仅供旧 18 秒排队任务
   prompt: string | null
   scene: StyleScene | null
   examples: {

@@ -180,6 +180,24 @@ describe('视频服务商探测', () => {
     expect(await probe('video', { VIDEO_PROVIDER: 'nanoapi' })).toMatchObject({ status: 'fail', message: 'NANOAPI_API_KEY 未配置' })
   })
 
+  it('Kie.ai：余额接口返回 credits，按 $0.005 / credit 换算美元并沿用 $10 低余额阈值', async () => {
+    const env = { VIDEO_PROVIDER: 'kie', KIE_API_KEY: 'kie_key_abcdefgh' }
+    const calls = stubFetch({ 'api.kie.ai/api/v1/chat/credit': { body: { code: 200, msg: 'success', data: 2500 } } })
+    expect(await probe('video', env)).toMatchObject({
+      status: 'ok',
+      provider: 'kie',
+      message: '鉴权正常，余额 2500.00 credits (~$12.50)',
+    })
+    expect(calls[0]?.url).toBe('https://api.kie.ai/api/v1/chat/credit')
+    expect(calls[0]?.auth).toBe('Bearer kie_key_abcdefgh')
+
+    stubFetch({ 'api.kie.ai/api/v1/chat/credit': { body: { code: 200, data: 1000 } } })
+    expect(await probe('video', env)).toMatchObject({ status: 'warn', message: '鉴权正常，但 Kie.ai 余额只剩 1000.00 credits (~$5.00)，请尽快充值' })
+    stubFetch({ 'api.kie.ai/api/v1/chat/credit': { body: { code: 401, msg: 'invalid key' } } })
+    expect(await probe('video', env)).toMatchObject({ status: 'fail', message: 'KIE_API_KEY 无效' })
+    expect(await probe('video', { VIDEO_PROVIDER: 'kie' })).toMatchObject({ status: 'fail', message: 'KIE_API_KEY 未配置' })
+  })
+
   it('上游报错里出现的密钥值被替换掉', async () => {
     const key = 'fal_secret_value_123'
     vi.stubGlobal('fetch', async () => {

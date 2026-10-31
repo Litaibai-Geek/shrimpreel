@@ -171,9 +171,12 @@ async function probeStripePrices(
   return ok(`鉴权正常，${items.length} 个套餐的 Price 和价格与 site.ts 一致`)
 }
 
-function balanceOutcome(amount: number, currency: string, provider: string) {
-  const text = `${amount.toFixed(2)} ${currency}`
-  return amount < ALERT_RULES.provider_balance.lowUsd ? warn(`鉴权正常，但 ${provider} 余额只剩 ${text}，请尽快充值`) : ok(`鉴权正常，余额 ${text}`)
+function balanceOutcome(amount: number, currency: string, provider: string, amountUsd?: number) {
+  const text = currency === 'credits' && amountUsd !== undefined
+    ? `${amount.toFixed(2)} credits (~${amountUsd.toFixed(2)})`
+    : `${amount.toFixed(2)} ${currency}`
+  const usd = amountUsd ?? amount
+  return usd < ALERT_RULES.provider_balance.lowUsd ? warn(`鉴权正常，但 ${provider} 余额只剩 ${text}，请尽快充值`) : ok(`鉴权正常，余额 ${text}`)
 }
 
 async function probeVideo(env: Env): Promise<Outcome> {
@@ -185,7 +188,7 @@ async function probeVideo(env: Env): Promise<Outcome> {
   if (result.status === 'forbidden') return warn(`${result.keyName} 有效，但没有 billing:usage:read 权限，查不到余额（不影响生成）`)
   if (result.status === 'http') return fail(`查询余额返回 HTTP ${result.code}`)
   if (result.status === 'unreadable') return warn('鉴权正常，但读不到余额')
-  return balanceOutcome(result.amount, result.currency, result.provider)
+  return balanceOutcome(result.amount, result.currency, result.provider, result.amountUsd)
 }
 
 async function probeModeration(env: Env): Promise<Outcome> {

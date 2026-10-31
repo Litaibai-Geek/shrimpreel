@@ -16,7 +16,7 @@ const EXCLUDED_FAILURES = ['admin_failed', 'content_removed']
 
 // 视频服务商账户问题（没配密钥、密钥失效、余额或月度额度不足）：重试没用，要站长去服务商后台处理。
 // 任务已失败退积分，但之后的任务会一直失败，所以出现 1 个就告警，不等失败率
-export const PROVIDER_ACCOUNT_ERRORS = ['provider_not_configured', 'YIR_UNAUTHORIZED', 'YIR_INSUFFICIENT_BALANCE', 'YIR_SPEND_LIMIT_EXCEEDED', 'nanoapi_invalid_api_key', 'nanoapi_insufficient_balance', 'nanoapi_account_suspended']
+export const PROVIDER_ACCOUNT_ERRORS = ['provider_not_configured', 'YIR_UNAUTHORIZED', 'YIR_INSUFFICIENT_BALANCE', 'YIR_SPEND_LIMIT_EXCEEDED', 'nanoapi_invalid_api_key', 'nanoapi_insufficient_balance', 'nanoapi_account_suspended', 'kie_unauthorized', 'kie_insufficient_credits']
 
 export const ALERT_RULES = {
   // 最近 1 小时完成的任务里失败 ≥ 3 个且占比 ≥ 30%（零星失败、大流量下的个别失败不报）
@@ -73,8 +73,12 @@ export function evaluateHealth(stats: HealthStats): Alert[] {
   const account = stats.providerAccount
   if (account.count >= ALERT_RULES.provider_account.min) alerts.push(alert('provider_account', account.count, { detail: account.detail }))
   const balance = stats.providerBalance
-  if (balance && balance.amount < ALERT_RULES.provider_balance.lowUsd) {
-    alerts.push(alert('provider_balance', 1, { detail: `${balance.provider} 余额 ${balance.amount.toFixed(2)} ${balance.currency}` }))
+  const balanceUsd = balance?.amountUsd ?? balance?.amount
+  if (balance && balanceUsd !== undefined && balanceUsd < ALERT_RULES.provider_balance.lowUsd) {
+    const display = balance.currency === 'credits' && balance.amountUsd !== undefined
+      ? `${balance.amount.toFixed(2)} credits (~${balance.amountUsd.toFixed(2)})`
+      : `${balance.amount.toFixed(2)} ${balance.currency}`
+    alerts.push(alert('provider_balance', 1, { detail: `${balance.provider} 余额 ${display}` }))
   }
   if (stats.backlog >= ALERT_RULES.job_backlog.min) alerts.push(alert('job_backlog', stats.backlog))
   const webhooks = stats.webhookFailures

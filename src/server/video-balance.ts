@@ -1,3 +1,4 @@
+import { site } from '#/config/site'
 import { cleanSecret } from './util'
 import { activeVideoProviderId } from './video'
 
@@ -8,6 +9,8 @@ export interface VideoBalance {
   provider: string
   amount: number
   currency: string
+  // Kie.ai 返回的是 credits；用当前模型页标价换算美元，仅用于统一的低余额告警阈值。
+  amountUsd?: number
 }
 
 export type BalanceQuery =
@@ -47,6 +50,17 @@ export async function queryVideoBalance(env: Env): Promise<BalanceQuery> {
     const body = (await response.json().catch(() => null)) as { data?: { available?: unknown; currency?: unknown } } | null
     return readBalance('NanoAPI', body?.data?.available, body?.data?.currency)
   }
+  if (id === 'kie') {
+    const key = cleanSecret(env.KIE_API_KEY)
+    if (!key) return { status: 'no_key', keyName: 'KIE_API_KEY' }
+    const response = await fetch('https://api.kie.ai/api/v1/chat/credit', { headers: { Authorization: `Bearer ${key}` } })
+    const body = (await response.json().catch(() => null)) as { code?: number | string; data?: unknown } | null
+    if (response.status === 401 || Number(body?.code) === 401) return { status: 'unauthorized', keyName: 'KIE_API_KEY' }
+    if (!response.ok) return { status: 'http', code: response.status }
+    if (!body || Number(body.code) !== 200) return { status: 'http', code: Number(body?.code ?? response.status) }
+    const balance = readBalance('Kie.ai', body.data, 'credits')
+    return balance.status === 'ok' ? { ...balance, amountUsd: balance.amount * site.video.kie.usdPerCredit } : balance
+  }
   const key = cleanSecret(env.YIR_API_KEY)
   if (!key) return { status: 'no_key', keyName: 'YIR_API_KEY' }
   const response = await fetch('https://gateway.yir.ai/v1/balance', { headers: { Authorization: `Bearer ${key}` } })
@@ -61,5 +75,5 @@ export async function queryVideoBalance(env: Env): Promise<BalanceQuery> {
 export async function fetchVideoBalance(env: Env): Promise<VideoBalance | null> {
   const result = await queryVideoBalance(env)
   if (result.status === 'http') throw new Error(`video balance HTTP ${result.code}`)
-  return result.status === 'ok' ? { provider: result.provider, amount: result.amount, currency: result.currency } : null
+  return result.status === 'ok' ? result : null
 }

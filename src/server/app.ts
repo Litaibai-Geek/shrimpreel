@@ -796,14 +796,28 @@ app.post('/api/webhooks/stripe', async (c) => {
   return c.json({ received: true, ...result })
 })
 
-// 视频服务商完成回调（fal、yir、nanoapi）：只当作“立即轮询”的信号，真实结果由 jobs.ts 用 API key 拉取，
-// 所以只校验地址里的任务 token，不验 yir 的签名头；nanoapi 的回调不带签名，同样只靠地址里的 token
-for (const provider of ['fal', 'yir', 'nanoapi']) {
+// 视频服务商完成回调（fal、yir、nanoapi、kie）：只当作“立即轮询”的信号，真实结果由 jobs.ts 用 API key 拉取，
+// 所以只校验地址里的任务 token，不验 yir 的签名头；nanoapi 和 Kie 的回调也只靠地址里的 token
+for (const provider of ['fal', 'yir', 'nanoapi', 'kie']) {
   app.post(`/api/webhooks/${provider}`, async (c) => {
     const generationId = c.req.query('gen') ?? ''
     const token = c.req.query('token') ?? ''
     if (!generationId || !constantTimeEqual(token, await jobToken(c.env, generationId))) {
       throw new WebhookVerificationError(`invalid ${provider} job token`)
+    }
+    if (provider === 'kie') {
+      // Kie callback includes data.taskId. Persist it if createTask succeeded upstream but the Worker
+      // lost the create response before saving provider_request_id; this avoids blindly resubmitting.
+      const payload = (await c.req.json().catch(() => null)) as { data?: { taskId?: unknown } } | null
+      const taskId = typeof payload?.data?.taskId === 'string' ? payload.data.taskId : ''
+      if (taskId) {
+        await c.env.DB.prepare(
+          `UPDATE generations SET status = 'processing', provider_request_id = ?, updated_at = ?
+           WHERE id = ? AND provider = 'kie' AND status IN ('queued', 'processing') AND provider_request_id IS NULL`,
+        )
+          .bind(taskId, nowIso(), generationId)
+          .run()
+      }
     }
     await enqueueJob(c.env, { kind: 'poll', generationId })
     return c.json({ received: true })
