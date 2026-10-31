@@ -74,6 +74,15 @@ export function en(s: S) {
       creditNote: 'Licensed Pexels performance footage is shown for visual reference only. These are not AI-generated TinyDeskAI results; your video is generated from your own portrait.',
     },
     generator: {
+      modeLabel: 'Creation mode',
+      modeSolo: 'Solo · 1 person',
+      modeBand: 'Band · 2–5 people',
+      bandStepPhoto: 'Select the band members',
+      bandChoose: 'Choose 2–5 photos at once',
+      bandRoleNames: ['Lead singer', 'Keyboard', 'Saxophone', 'Backing singer', 'Drummer'],
+      bandGuidance: 'Select different photos in the displayed role order: lead singer, keyboard, saxophone, backing singer, drummer. JPG/PNG/WebP, up to 10 MB each. Numbered image roles are guidance only; the AI may mix faces or roles. No video upload is required.',
+      bandConsent: 'I have explicit permission from every adult in these photos. All people are at least 18 and none are celebrities or public figures.',
+      bandShortWarning: 'Six seconds may not show every member. We recommend 12 or 15 seconds for Band mode.',
       // 只给读屏用（sr-only），不放关键词，避免隐藏文字堆词
       title: 'Create your video',
       stepPhoto: 'Your portrait',
@@ -231,7 +240,7 @@ export function en(s: S) {
       items: [
         { q: 'What is the Outstanding Tiny Desk AI trend?', a: 'It is an October 2026 AI parody trend inspired by the desk-band setting of Charlie Wilson’s 2023 NPR Tiny Desk performance of Outstanding. Our independent one-photo generator makes a new desk-session-style video rather than reproducing the original show or song.', guide: { article: 'trend', label: 'Learn the origin of the Outstanding Tiny Desk meme' } },
         { q: 'Does this use the original Outstanding song?', a: 'No. The generator requests AI-created audio and does not include the original Charlie Wilson recording or guarantee a particular song.' },
-        { q: 'Can I upload five different performers?', a: 'Not yet. This generator currently supports one authorized adult portrait and a single desk-session style, with 6, 12 or 15-second output.' },
+        { q: 'Can I upload five different performers?', a: 'Yes. Choose Band mode and upload 2–5 distinct consenting adult portraits in the displayed singer, keyboard, saxophone, backing singer and drummer order. The AI tries to assign roles but cannot guarantee exact identity mapping.' },
         { q: 'What photo works best?', a: 'Use a sharp, front-facing photo of one adult with the face unobstructed and the upper body visible. Avoid group photos, sunglasses, masks and heavy filters.', guide: { article: 'howTo', label: 'Photo tips for a Tiny Desk AI video' } },
         { q: 'Is Tiny Desk AI affiliated with NPR?', a: 'No. Tiny Desk AI is an independent creative tool and is not affiliated with NPR, the Tiny Desk Concert series, any artist, venue or rights holder.' },
         { q: 'Will the generated video match my photo perfectly?', a: 'No AI video can guarantee an exact result. Motion, hands, instruments, clothing and facial details may vary. Review the MP4 before sharing.' },
@@ -631,7 +640,7 @@ export function en(s: S) {
           ] },
           { h: 'The video effect people are trying to make', p: [
             'People looking for an Outstanding Tiny Desk AI template often want the recognizable ensemble scene: a desk-side band, expressive singing close-ups, warm studio lighting, keys and a saxophone moment. A five-person face-replacement edit is a different workflow from generating a new scene with a single portrait.',
-            'This website currently accepts one authorized adult portrait, offers one desk-session performance style, and lets you choose a 6, 12 or 15-second vertical output. It does not currently provide five separate cast slots, exact shot-by-shot recreation, or the original Outstanding recording.'
+            'This website currently accepts one authorized adult portrait, offers one desk-session performance style, and lets you choose a 6, 12 or 15-second vertical output. It now offers a 2–5 person Band mode with numbered role references, but does not guarantee exact shot-by-shot recreation or include the original Outstanding recording.'
           ] },
           { h: 'How to make an original desk-session AI video', p: [
             'Sign in with Google, select one clear portrait of yourself or an adult who gave permission, and choose the output length. You do not need to upload an additional video: the site supplies a motion-reference clip automatically.',
@@ -654,7 +663,7 @@ export function en(s: S) {
           ] },
           { h: '2. Pick a generated-video length', p: [
             'Choose 6, 12 or 15 seconds. Each output second costs one credit, so a 15-second render uses 15 credits. The reference-performance clip is selected by the site automatically; there is no separate user video-upload step.',
-            'The currently supported output is vertical 9:16. This is a single-person workflow, not a multi-cast video editor.'
+            'The currently supported output is vertical 9:16. Solo uses one portrait; Band uses 2–5 separate portraits in role order, but it is not a frame-accurate multi-cast video editor.'
           ] },
           { h: '3. Start the render and check progress', p: [
             'Confirm permission to use the photo, ensure your account has sufficient credits, and submit the generation task. Video creation is asynchronous. You may leave the page and check My videos while the render is processing.',

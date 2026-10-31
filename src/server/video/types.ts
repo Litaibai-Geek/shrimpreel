@@ -6,6 +6,7 @@ export interface VideoSubmitInput {
   style: Style
   durationSeconds: number
   imageUrl: string
+  imageUrls?: string[] // ordered Band images, undefined for Solo/legacy jobs
   sourceVideoUrl: string
   sourceVideoKey: string
   webhookUrl: string

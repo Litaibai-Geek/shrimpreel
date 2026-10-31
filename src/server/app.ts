@@ -3,6 +3,7 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { defaultStyle, findDuration, findPackage, findPlan, findStyle, isLocale, localePath, sellingPlans, site } from '#/config/site'
 import { safeRedirectPath } from '#/lib/redirect'
+import { isBandUploadIds } from '#/lib/band'
 import { exportFileName, exportUserData } from './account-export'
 import { adminRoutes } from './admin'
 import { runHealthCheck } from './alerts'
@@ -286,17 +287,35 @@ app.post('/api/generations', async (c) => {
   const settings = await getSettings(c.env)
   assertOpen(settings, user)
   await rateLimit(c.env.GENERATE_LIMITER, user.id)
-  const body = await readJson<{ uploadId: string; durationId: string; styleId?: string; mockOutcome: string; locale: string }>(c)
+  const body = await readJson<{ uploadId: string; uploadIds: unknown; mode: 'solo' | 'band'; durationId: string; styleId?: string; mockOutcome: string; locale: string }>(c)
+  const mode = body.mode ?? 'solo'
+  if (mode !== 'solo' && mode !== 'band') throw new ApiError(400, 'band_invalid')
+  let bandIds: string[] = []
+  if (mode === 'band') {
+    if (!isBandUploadIds(body.uploadIds)) throw new ApiError(400, 'band_invalid')
+    bandIds = body.uploadIds
+  }
   const duration = findDuration(body.durationId ?? '')
   if (!duration) throw new ApiError(400, 'invalid_duration')
   // 不带 styleId 用默认风格；带了但不存在报错，不悄悄换风格
   const style = body.styleId === undefined || body.styleId === null ? defaultStyle : findStyle(String(body.styleId))
   if (!style) throw new ApiError(400, 'invalid_style')
   const db = c.env.DB
-  const upload = await db
-    .prepare('SELECT * FROM uploads WHERE id = ? AND user_id = ? AND expired_at IS NULL')
-    .bind(body.uploadId ?? '', user.id)
-    .first<UploadRow>()
+  let upload: UploadRow | null
+  if (mode === 'band') {
+    const found = await db
+      .prepare(`SELECT * FROM uploads WHERE id IN (${bandIds.map(() => '?').join(',')}) AND user_id = ? AND expired_at IS NULL`)
+      .bind(...bandIds, user.id)
+      .all<UploadRow>()
+    const ordered = bandIds.map((id) => found.results.find((item) => item.id === id))
+    if (ordered.some((item) => !item)) throw new ApiError(400, 'invalid_upload')
+    const hashes = ordered.map((item) => item!.sha256).filter((hash): hash is string => !!hash)
+    if (new Set(hashes).size !== hashes.length) throw new ApiError(400, 'band_duplicate')
+    upload = ordered[0]!
+  } else {
+    upload = await db.prepare('SELECT * FROM uploads WHERE id = ? AND user_id = ? AND expired_at IS NULL')
+      .bind(body.uploadId ?? '', user.id).first<UploadRow>()
+  }
   if (!upload) throw new ApiError(400, 'invalid_upload')
   const active = await db
     .prepare(`SELECT COUNT(*) AS n FROM generations WHERE user_id = ? AND status IN ('queued', 'processing')`)
@@ -308,8 +327,11 @@ app.post('/api/generations', async (c) => {
   await rememberLocale(c.env, user, body.locale)
 
   const providerId = activeVideoProviderId(c.env)
+  if (mode === 'band' && providerId !== 'kie' && providerId !== 'mock') throw new ApiError(503, 'band_provider_unavailable')
   const mockOutcome = providerId === 'mock' && (body.mockOutcome === 'fail' || body.mockOutcome === 'hang') ? body.mockOutcome : null
-  const meta = mockOutcome ? JSON.stringify({ mockOutcome }) : null
+  const meta = mode === 'band'
+    ? JSON.stringify({ mode: 'band', band: { uploadIds: bandIds }, ...(mockOutcome ? { mockOutcome } : {}) })
+    : mockOutcome ? JSON.stringify({ mockOutcome }) : null
   const id = createId('gen')
   const now = nowIso()
   try {

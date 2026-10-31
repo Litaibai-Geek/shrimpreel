@@ -2,6 +2,7 @@ import { useRouterState } from '@tanstack/react-router'
 import { CircleAlert, CircleCheck, Download, Upload } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { STYLES, cheapestPackageCovering, defaultStyle, formatPrice, site } from '#/config/site'
+import { BAND_MAX, BAND_MIN, BAND_ROLES } from '#/lib/band'
 import { api, errorCode, isActiveGeneration, type Generation } from '#/lib/api'
 import { track } from '#/lib/attribution'
 import { useCheckout } from '#/lib/checkout'
@@ -22,6 +23,10 @@ export function Generator({ styleId: controlledStyleId, onStyleChange }: { style
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const { user, config, loading, refresh } = useSession()
   const inputRef = useRef<HTMLInputElement>(null)
+  const bandInputRef = useRef<HTMLInputElement>(null)
+  const [mode, setMode] = useState<'solo' | 'band'>('solo')
+  const [bandPhotos, setBandPhotos] = useState<Photo[]>([])
+  const bandUploadsRef = useRef(new Map<File, string>())
   const [photo, setPhoto] = useState<Photo | null>(null)
   const [uploading, setUploading] = useState(false)
   const [dragging, setDragging] = useState(false)
@@ -43,6 +48,9 @@ export function Generator({ styleId: controlledStyleId, onStyleChange }: { style
   useEffect(() => () => {
     if (photo) URL.revokeObjectURL(photo.previewUrl)
   }, [photo])
+  useEffect(() => () => {
+    bandPhotos.forEach((item) => URL.revokeObjectURL(item.previewUrl))
+  }, [bandPhotos])
 
   // 轮询当前任务直到结束；结束后刷新余额（失败时积分已退回）
   useEffect(() => {
@@ -89,14 +97,42 @@ export function Generator({ styleId: controlledStyleId, onStyleChange }: { style
     }
   }
 
+  function selectBandFiles(files: FileList | null) {
+    if (!files) return
+    const picked = Array.from(files)
+    if (picked.length < BAND_MIN || picked.length > BAND_MAX) return setError('band_invalid')
+    if (picked.some((file) => !(site.upload.contentTypes as readonly string[]).includes(file.type))) return setError('unsupported_file_type')
+    if (picked.some((file) => file.size > site.upload.maxBytes)) return setError('file_too_large')
+    bandUploadsRef.current.clear()
+    setBandPhotos(picked.map((file) => ({ file, previewUrl: URL.createObjectURL(file), uploadId: null })))
+    setGeneration(null)
+    setError(null)
+  }
+
   async function generate() {
-    if (!photo) return setError('invalid_upload')
+    if (mode === 'solo' && !photo) return setError('invalid_upload')
+    if (mode === 'band' && (bandPhotos.length < BAND_MIN || bandPhotos.length > BAND_MAX)) return setError('band_invalid')
     setError(null)
     setSubmitting(true)
     try {
-      const uploadId = photo.uploadId ?? (await upload(photo.file))
-      if (!photo.uploadId) setPhoto({ ...photo, uploadId })
-      const data = await api<{ generation: Generation }>('/api/generations', { json: { uploadId, durationId, styleId, locale } })
+      let json: Record<string, unknown>
+      if (mode === 'band') {
+        const uploadIds: string[] = []
+        for (const item of bandPhotos) {
+          let id = bandUploadsRef.current.get(item.file)
+          if (!id) {
+            id = await upload(item.file)
+            bandUploadsRef.current.set(item.file, id)
+          }
+          uploadIds.push(id)
+        }
+        json = { mode: 'band', uploadIds, durationId, styleId, locale }
+      } else {
+        const uploadId = photo!.uploadId ?? (await upload(photo!.file))
+        if (!photo!.uploadId) setPhoto({ ...photo!, uploadId })
+        json = { uploadId, durationId, styleId, locale }
+      }
+      const data = await api<{ generation: Generation }>('/api/generations', { json })
       track('generate_video', { style_id: styleId, duration_id: durationId, credits: data.generation.creditsCost })
       setGeneration(data.generation)
       await refresh()
@@ -114,6 +150,7 @@ export function Generator({ styleId: controlledStyleId, onStyleChange }: { style
   }
 
   const busy = uploading || submitting || (generation !== null && isActiveGeneration(generation))
+  const photosReady = mode === 'band' ? bandPhotos.length >= BAND_MIN && bandPhotos.length <= BAND_MAX : Boolean(photo)
 
   return (
     <section
@@ -125,7 +162,18 @@ export function Generator({ styleId: controlledStyleId, onStyleChange }: { style
       <h2 id="generator-title" className="sr-only">
         {g.title}
       </h2>
-      {/* 1. 照片 */}
+      <div className="grid grid-cols-2 gap-1 rounded-xl bg-bg-soft p-1" role="radiogroup" aria-label={g.modeLabel} data-testid="generator-mode">
+        {(['solo', 'band'] as const).map((choice) => (
+          <button key={choice} type="button" role="radio" aria-checked={mode === choice} disabled={busy}
+            onClick={() => { setMode(choice); setGeneration(null); setError(null) }}
+            className={`rounded-lg px-3 py-2 text-sm font-semibold ${mode === choice ? 'bg-card shadow-sm ring-1 ring-line' : 'text-muted hover:text-fg'}`}
+            data-testid={`mode-${choice}`}>
+            {choice === 'solo' ? g.modeSolo : g.modeBand}
+          </button>
+        ))}
+      </div>
+      {/* Solo: preserve the original photo upload UI. */}
+      {mode === 'solo' ? (
       <section className="space-y-3">
         <StepTitle n={1}>{g.stepPhoto}</StepTitle>
         {/* 键盘与读屏从下面的按钮进入，隐藏的 input 不占 Tab 位 */}
@@ -184,6 +232,30 @@ export function Generator({ styleId: controlledStyleId, onStyleChange }: { style
         <p className="text-xs leading-5 text-muted">{g.guidance}</p>
         {!user && photo ? <p className="text-xs leading-5 text-muted" role="status">{g.signInNote}</p> : null}
       </section>
+      ) : (
+      <section className="space-y-3">
+        <StepTitle n={1}>{g.bandStepPhoto}</StepTitle>
+        <input ref={bandInputRef} type="file" multiple accept={site.upload.contentTypes.join(',')}
+          className="sr-only" tabIndex={-1} aria-label={g.bandChoose} data-testid="band-photos"
+          onChange={(event) => { selectBandFiles(event.target.files); event.target.value = '' }} />
+        <button type="button" disabled={busy} onClick={() => bandInputRef.current?.click()}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line px-4 py-5 text-sm font-semibold hover:border-fg/40"
+          data-testid="band-select"><Upload className="size-5" />{g.bandChoose}</button>
+        <p className="text-xs leading-5 text-muted">{g.bandGuidance}</p>
+        {bandPhotos.length > 0 ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-testid="band-preview">
+            {bandPhotos.map((item, index) => (
+              <div key={index} className="rounded-xl border border-line p-2">
+                <img src={item.previewUrl} alt="" className="aspect-square w-full rounded-md object-cover" />
+                <p className="mt-2 text-xs font-medium">{g.bandRoleNames[index]}</p>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        {!user && bandPhotos.length ? <p className="text-xs text-muted">{g.signInNote}</p> : null}
+        {durationId === 'short' ? <p className="text-xs text-muted">{g.bandShortWarning}</p> : null}
+      </section>
+      )}
 
       {/* 2. 风格：只有一种风格时不显示 */}
       {STYLES.length > 1 ? (
@@ -253,7 +325,7 @@ export function Generator({ styleId: controlledStyleId, onStyleChange }: { style
           className="mt-0.5 size-4 shrink-0 accent-[var(--ink)]"
           data-testid="consent"
         />
-        <span>{g.consent}</span>
+        <span>{mode === 'band' ? g.bandConsent : g.consent}</span>
       </label>
 
       {/* CTA */}
@@ -300,7 +372,7 @@ export function Generator({ styleId: controlledStyleId, onStyleChange }: { style
           <button
             type="button"
             className="btn-primary w-full py-3.5"
-            disabled={busy || !photo || !consent}
+            disabled={busy || !photosReady || !consent}
             onClick={generate}
             data-testid="generate"
           >
@@ -314,7 +386,7 @@ export function Generator({ styleId: controlledStyleId, onStyleChange }: { style
             {shortfall > 0 ? ` · ${g.needMore(shortfall)}` : ''}
           </p>
         ) : null}
-        {user && photo && !consent && !generation ? <p className="text-center text-xs text-muted">{g.needConsent}</p> : null}
+        {user && photosReady && !consent && !generation ? <p className="text-center text-xs text-muted">{g.needConsent}</p> : null}
         <ErrorText code={error} />
       </div>
 

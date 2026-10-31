@@ -67,6 +67,8 @@ export type ClientConfig = {
 
 export type Generation = {
   id: string
+  mode?: 'solo' | 'band'
+  memberCount?: number
   templateId: string
   durationId: string
   durationSeconds: number

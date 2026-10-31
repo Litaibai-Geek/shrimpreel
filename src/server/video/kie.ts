@@ -2,6 +2,7 @@
 // Seedance 2.0 Mini multimodal reference mode: one uploaded portrait + one R2-hosted reference clip.
 // Do not send first_frame_url / last_frame_url together with reference_* fields; Kie documents these modes as mutually exclusive.
 import { site } from '#/config/site'
+import { BAND_MAX, BAND_MIN, bandPrompt } from '#/lib/band'
 import { cleanSecret } from '../util'
 import type { VideoProvider, VideoStatus } from './types'
 import { VideoProviderError } from './types'
@@ -54,7 +55,12 @@ export function createKieProvider(env: Env): VideoProvider {
     id: 'kie',
 
     async submit(input) {
-      const prompt = (input.style.prompt ?? site.video.kie.prompt).trim()
+      const isBand = input.meta.mode === 'band'
+      const images = input.imageUrls ?? [input.imageUrl]
+      if (isBand && (images.length < BAND_MIN || images.length > BAND_MAX)) {
+        throw new VideoProviderError('kie_invalid_band', 'Band needs 2–5 reference images', false)
+      }
+      const prompt = (isBand ? bandPrompt(images.length) : (input.style.prompt ?? site.video.kie.prompt)).trim()
       if (prompt.length < 3 || prompt.length > 20_000) {
         throw new VideoProviderError('kie_invalid_prompt', 'Seedance prompt must be between 3 and 20000 characters', false)
       }
@@ -66,7 +72,7 @@ export function createKieProvider(env: Env): VideoProvider {
         model: site.video.kie.model,
         input: {
           prompt,
-          reference_image_urls: [input.imageUrl],
+          reference_image_urls: images,
           reference_video_urls: [input.sourceVideoUrl],
           generate_audio: site.video.kie.generateAudio,
           resolution: site.video.kie.resolution,

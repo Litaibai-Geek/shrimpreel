@@ -1,4 +1,5 @@
 import { findDuration, findStyle } from '#/config/site'
+import { isBandUploadIds } from '#/lib/band'
 import { jobToken, signedUploadUrl, templateSourceUrl } from './media'
 import { expireStatements, generationRefundStatements } from './credits'
 import { notifyGenerationFinished } from './notifications'
@@ -126,14 +127,28 @@ async function submitGeneration(env: Env, generation: GenerationRow) {
         ? style?.sources.legacyFull
         : style?.sources[duration.id]
     : undefined
-  const upload = await env.DB.prepare('SELECT * FROM uploads WHERE id = ?').bind(generation.upload_id).first<UploadRow>()
-  if (!duration || !style || !sourceFile || !upload || upload.expired_at) {
+  const baseMeta = parseMeta(generation.provider_meta)
+  const band = baseMeta.band
+  const maybeBandIds = band && typeof band === 'object' ? (band as { uploadIds?: unknown }).uploadIds : undefined
+  if (baseMeta.mode === 'band' && !isBandUploadIds(maybeBandIds)) {
+    await failGeneration(env, generation.id, 'invalid_band', 'Band photo references are invalid')
+    return
+  }
+  const uploadIds = baseMeta.mode === 'band' && isBandUploadIds(maybeBandIds) ? maybeBandIds : [generation.upload_id]
+  const uploads = await Promise.all(uploadIds.map((id) =>
+    env.DB.prepare('SELECT * FROM uploads WHERE id = ? AND user_id = ? AND expired_at IS NULL')
+      .bind(id, generation.user_id).first<UploadRow>(),
+  ))
+  if (!duration || !style || !sourceFile || uploads.some((u) => !u)) {
     await failGeneration(env, generation.id, 'invalid_input', 'Upload, style or duration no longer exists')
     return
   }
 
   const provider = getVideoProvider(env, generation.provider)
-  const baseMeta = parseMeta(generation.provider_meta)
+  if (baseMeta.mode === 'band' && provider.id !== 'kie' && provider.id !== 'mock') {
+    await failGeneration(env, generation.id, 'unsupported_band_provider', 'Band mode requires Kie')
+    return
+  }
 
   // 签名在 try 里：生产环境 SESSION_SECRET 配错时会抛错，要和提交失败一样放回 queued，交给队列重试和死信退款
   let providerRequestId: string | null = null
@@ -142,11 +157,15 @@ async function submitGeneration(env: Env, generation: GenerationRow) {
     webhookUrl.searchParams.set('gen', generation.id)
     webhookUrl.searchParams.set('token', await jobToken(env, generation.id))
     // 重新提交时请求体要和第一次一致，签名按任务创建时间算（任务 45 分钟超时，2 小时有效期足够）
+    const imageUrls = await Promise.all(uploadIds.map((id) =>
+      signedUploadUrl(env, id, Date.parse(generation.created_at)),
+    ))
     const result = await provider.submit({
       generationId: generation.id,
       style,
       durationSeconds: generation.duration_seconds,
-      imageUrl: await signedUploadUrl(env, upload.id, Date.parse(generation.created_at)),
+      imageUrl: imageUrls[0]!,
+      ...(baseMeta.mode === 'band' ? { imageUrls } : {}),
       sourceVideoUrl: templateSourceUrl(env, sourceFile),
       sourceVideoKey: `templates/${sourceFile}`,
       webhookUrl: webhookUrl.toString(),
@@ -157,7 +176,7 @@ async function submitGeneration(env: Env, generation: GenerationRow) {
     await env.DB.prepare(
       `UPDATE generations SET provider_request_id = ?, provider_meta = ?, started_at = ?, updated_at = ? WHERE id = ?`,
     )
-      .bind(result.requestId, JSON.stringify(result.meta), now, now, generation.id)
+      .bind(result.requestId, JSON.stringify({ ...baseMeta, ...result.meta }), now, now, generation.id)
       .run()
     await enqueueJob(env, { kind: 'poll', generationId: generation.id }, POLL_DELAY_SECONDS[provider.id])
   } catch (error) {

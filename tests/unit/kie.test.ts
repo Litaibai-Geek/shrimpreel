@@ -62,6 +62,16 @@ describe('Kie.ai Seedance 2.0 Mini：提交', () => {
     expect(String((calls[0]!.body!.input as Record<string, unknown>).prompt)).toContain('Video 1')
   })
 
+  it.each([2, 3, 4, 5])('Band %i 人按顺序提交参考图与角色提示词', async (n) => {
+    const calls = stubFetch({ 'POST /api/v1/jobs/createTask': () => ok({ taskId: 'task_band' }) })
+    const imageUrls = Array.from({ length: n }, (_, i) => `https://example.com/upl_${i}.jpg`)
+    await createKieProvider(env()).submit({ ...input(), imageUrls, meta: { mode: 'band' } })
+    expect(calls[0]!.body!.input).toMatchObject({ reference_image_urls: imageUrls, duration: 15, resolution: '720p' })
+    const prompt = String((calls[0]!.body!.input as Record<string, unknown>).prompt)
+    expect(prompt).toContain(`Image ${n}`)
+    expect(prompt).toContain('Video 1')
+  })
+
   it('本地 HTTP 环境不发送无法访问的 callback URL，依靠任务轮询', async () => {
     const calls = stubFetch({ 'POST /api/v1/jobs/createTask': () => ok({ taskId: 'task_local' }) })
     await createKieProvider(env()).submit(input('http://localhost:3000/api/webhooks/kie?gen=gen_1&token=t'))

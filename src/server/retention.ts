@@ -20,7 +20,15 @@ export async function sweepExpiredMedia(env: Env, options: SweepOptions = {}) {
     const cutoff = new Date(now - site.retention.uploadDays * DAY_MS).toISOString()
     const rows = await env.DB.prepare(
       `SELECT id, r2_key FROM uploads u WHERE expired_at IS NULL AND created_at < ? ${userFilter}
-       AND NOT EXISTS (SELECT 1 FROM generations g WHERE g.upload_id = u.id AND g.status IN ('queued', 'processing'))
+       AND NOT EXISTS (
+         SELECT 1 FROM generations g WHERE g.status IN ('queued', 'processing')
+           AND (g.upload_id = u.id OR EXISTS (
+             SELECT 1 FROM json_each(
+               CASE WHEN json_valid(g.provider_meta) THEN g.provider_meta ELSE '{}' END,
+               '$.band.uploadIds'
+             ) AS extra WHERE extra.value = u.id
+           ))
+       )
        LIMIT ${BATCH}`,
     )
       .bind(cutoff, ...userParams)
