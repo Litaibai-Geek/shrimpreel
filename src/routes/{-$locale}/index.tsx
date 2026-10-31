@@ -46,16 +46,22 @@ function Home() {
       {/* Hero：左侧生成器，右侧展示三段有授权的表演参考素材 */}
       <section className="relative overflow-hidden">
         <div className="hero-glow pointer-events-none absolute inset-0" aria-hidden />
-        <div className="container-page relative grid gap-10 py-10 lg:grid-cols-[minmax(0,430px)_1fr] lg:gap-16 lg:py-14">
-          <div className="space-y-5" id="create">
+        <div className="container-page relative grid gap-y-5 py-10 lg:grid-cols-[minmax(0,430px)_minmax(0,1fr)] lg:gap-x-16 lg:gap-y-5 lg:py-14">
+          {/* Desktop: a shared grid row keeps the generator and videos aligned in Solo and Band modes.
+              Mobile order retains heading → generator → badge → previews. */}
+          <div className="order-1 space-y-5">
             <h1 className="font-display text-5xl leading-[1.04] tracking-tight sm:text-6xl">{c.hero.title}</h1>
             <p className="text-lg leading-8 text-muted">{c.hero.subtitle}</p>
+          </div>
+          <div className="order-2 min-w-0 lg:order-3" id="create">
             <Generator styleId={style.id} onStyleChange={setStyleId} />
           </div>
-          <div className="flex flex-col justify-center gap-5">
+          <div className="order-3 flex items-start lg:order-2 lg:items-end">
             <span className="chip w-fit">
               <Flame className="size-4 text-accent" /> {c.hero.badge}
             </span>
+          </div>
+          <div className="order-4 flex min-w-0 flex-col gap-5">
             {STYLES.length > 1 ? (
               <div role="tablist" aria-label={c.generator.stepStyle} className="flex flex-wrap gap-2">
                 {STYLES.map((s) => {
