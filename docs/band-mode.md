@@ -6,7 +6,7 @@
 - The job signs all selected image URLs, submits them with Kie Seedance 2.0 Mini reference_image_urls plus the configured reference video, and retains the band IDs across provider responses for job recovery and retention. The cleanup sweep does not expire extra images while a Band job is queued or processing.
 - Credit price remains 1 credit/second in this MVP; the existing queue, provider callback/polling, R2 output, 45-minute timeout and failure-refund logic are shared with Solo.
 - Prompts provide role hints, but Seedance Mini does **not** guarantee each face/role or full ensemble appears accurately. Results must be checked in production before advertising guaranteed multi-person face swaps.
-- The group picker uses file selection order. The user can reselect photos to change ordering. Band does not modify or download the homepage demonstration media.
+- The group picker starts with file selection order. Left/right controls allow moving each portrait into its intended numbered role without re-uploading. The user can reselect photos to replace the entire group. Band does not modify or download the homepage demonstration media.
 
 ## Local verification before deployment
 1. Run npm ci, npm run typecheck, npm test, npm run build, and npm run doctor.

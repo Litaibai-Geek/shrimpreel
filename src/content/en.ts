@@ -79,8 +79,10 @@ export function en(s: S) {
       modeBand: 'Band · 2–5 people',
       bandStepPhoto: 'Select the band members',
       bandChoose: 'Choose 2–5 photos at once',
+      bandMoveEarlier: 'Move photo to previous role',
+      bandMoveLater: 'Move photo to next role',
       bandRoleNames: ['Lead singer', 'Keyboard', 'Saxophone', 'Backing singer', 'Drummer'],
-      bandGuidance: 'Select different photos in the displayed role order: lead singer, keyboard, saxophone, backing singer, drummer. JPG/PNG/WebP, up to 10 MB each. Numbered image roles are guidance only; the AI may mix faces or roles. No video upload is required.',
+      bandGuidance: 'Choose 2–5 different authorized adult portraits, then use the arrows to put each face in its desired role: lead singer, keyboard, saxophone, backing singer, drummer. JPG/PNG/WebP, up to 10 MB each. AI role matching is not guaranteed. No video upload required.',
       bandConsent: 'I have explicit permission from every adult in these photos. All people are at least 18 and none are celebrities or public figures.',
       bandShortWarning: 'Six seconds may not show every member. We recommend 12 or 15 seconds for Band mode.',
       // 只给读屏用（sr-only），不放关键词，避免隐藏文字堆词
@@ -640,7 +642,7 @@ export function en(s: S) {
           ] },
           { h: 'The video effect people are trying to make', p: [
             'People looking for an Outstanding Tiny Desk AI template often want the recognizable ensemble scene: a desk-side band, expressive singing close-ups, warm studio lighting, keys and a saxophone moment. A five-person face-replacement edit is a different workflow from generating a new scene with a single portrait.',
-            'This website currently accepts one authorized adult portrait, offers one desk-session performance style, and lets you choose a 6, 12 or 15-second vertical output. It now offers a 2–5 person Band mode with numbered role references, but does not guarantee exact shot-by-shot recreation or include the original Outstanding recording.'
+            'This website offers Solo for one authorized adult portrait and Band for 2–5 different adult portraits. Both use a desk-session style and offer 6, 12 or 15-second vertical outputs. Band role assignments are approximate: we do not promise an exact shot-by-shot recreation or include the original Outstanding recording.'
           ] },
           { h: 'How to make an original desk-session AI video', p: [
             'Sign in with Google, select one clear portrait of yourself or an adult who gave permission, and choose the output length. You do not need to upload an additional video: the site supplies a motion-reference clip automatically.',

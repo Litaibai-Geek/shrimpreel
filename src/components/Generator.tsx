@@ -26,6 +26,7 @@ export function Generator({ styleId: controlledStyleId, onStyleChange }: { style
   const bandInputRef = useRef<HTMLInputElement>(null)
   const [mode, setMode] = useState<'solo' | 'band'>('solo')
   const [bandPhotos, setBandPhotos] = useState<Photo[]>([])
+  const bandPhotosRef = useRef<Photo[]>([])
   const bandUploadsRef = useRef(new Map<File, string>())
   const [photo, setPhoto] = useState<Photo | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -48,9 +49,10 @@ export function Generator({ styleId: controlledStyleId, onStyleChange }: { style
   useEffect(() => () => {
     if (photo) URL.revokeObjectURL(photo.previewUrl)
   }, [photo])
+  useEffect(() => { bandPhotosRef.current = bandPhotos }, [bandPhotos])
   useEffect(() => () => {
-    bandPhotos.forEach((item) => URL.revokeObjectURL(item.previewUrl))
-  }, [bandPhotos])
+    bandPhotosRef.current.forEach((item) => URL.revokeObjectURL(item.previewUrl))
+  }, [])
 
   // 轮询当前任务直到结束；结束后刷新余额（失败时积分已退回）
   useEffect(() => {
@@ -103,10 +105,20 @@ export function Generator({ styleId: controlledStyleId, onStyleChange }: { style
     if (picked.length < BAND_MIN || picked.length > BAND_MAX) return setError('band_invalid')
     if (picked.some((file) => !(site.upload.contentTypes as readonly string[]).includes(file.type))) return setError('unsupported_file_type')
     if (picked.some((file) => file.size > site.upload.maxBytes)) return setError('file_too_large')
+    bandPhotosRef.current.forEach((item) => URL.revokeObjectURL(item.previewUrl))
     bandUploadsRef.current.clear()
     setBandPhotos(picked.map((file) => ({ file, previewUrl: URL.createObjectURL(file), uploadId: null })))
     setGeneration(null)
     setError(null)
+  }
+
+  function moveBandPhoto(from: number, to: number) {
+    setBandPhotos((current) => {
+      if (from < 0 || to < 0 || from >= current.length || to >= current.length) return current
+      const next = [...current]
+      ;[next[from], next[to]] = [next[to]!, next[from]!]
+      return next
+    })
   }
 
   async function generate() {
@@ -248,6 +260,14 @@ export function Generator({ styleId: controlledStyleId, onStyleChange }: { style
               <div key={index} className="rounded-xl border border-line p-2">
                 <img src={item.previewUrl} alt="" className="aspect-square w-full rounded-md object-cover" />
                 <p className="mt-2 text-xs font-medium">{g.bandRoleNames[index]}</p>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <button type="button" className="btn-ghost px-2 py-1 text-xs"
+                    aria-label={`${g.bandMoveEarlier}: ${g.bandRoleNames[index]}`}
+                    disabled={busy || index === 0} onClick={() => moveBandPhoto(index, index - 1)}>←</button>
+                  <button type="button" className="btn-ghost px-2 py-1 text-xs"
+                    aria-label={`${g.bandMoveLater}: ${g.bandRoleNames[index]}`}
+                    disabled={busy || index === bandPhotos.length - 1} onClick={() => moveBandPhoto(index, index + 1)}>→</button>
+                </div>
               </div>
             ))}
           </div>
