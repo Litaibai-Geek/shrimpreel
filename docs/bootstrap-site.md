@@ -56,3 +56,7 @@ site.setup.json 中填写：
 - npm run typecheck / npm test / npm run build / npm run doctor / 线上 SEO 和 Smoke Test
 
 本脚本只协调资源的初始化，**不会自动发布正式网站**。
+
+## V2 login switch
+
+After provisioning and validating Resend/Turnstile, apply 0016_email_login.sql and opt in through EMAIL_LOGIN_ENABLED=true. Existing Google users keep their accounts and explicitly enable email sign-in from Settings. Do not set EMAIL_LOGIN_ENABLED before sender verification, Turnstile and successful test deliveries.

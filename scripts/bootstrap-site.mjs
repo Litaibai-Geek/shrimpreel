@@ -240,6 +240,9 @@ export function main(argv = process.argv.slice(2), deps = {}) {
     if (options.mode === 'plan') {
       log('新站启动计划（没有联网或写入）：')
       planDescription(setup, parsedConfig(draft)).forEach((line) => log('  · ' + line))
+      if (setup.platforms?.cloudflare?.turnstile || setup.platforms?.cloudflare?.analytics || setup.platforms?.resend?.enabled) {
+        log('  · V2: Turnstile / Web Analytics / Resend 按配置创建（--apply 时）')
+      }
       if (original !== draft) log('  · wrangler.jsonc: 有待更新的公开配置字段')
       return 0
     }
@@ -269,6 +272,16 @@ export function main(argv = process.argv.slice(2), deps = {}) {
           return 0
         }
         throw new Error('D1/KV still have placeholder IDs in wrangler.jsonc')
+      }
+      // Optional V2: when the user enabled platform APIs, provision them
+      // before payment and runtime secret sync, without publishing the Worker.
+      const platforms = setup.platforms ?? {}
+      const enabled = Boolean(platforms.cloudflare?.turnstile || platforms.cloudflare?.analytics || platforms.resend?.enabled)
+      if (enabled) {
+        const result = runNode(['scripts/bootstrap-platforms.mjs', '--apply'])
+        if (!result.ok) throw new Error('V2 platform provisioning failed; inspect with npm run setup:platforms -- --verify')
+        updated = read(options.wranglerFile)
+        log('跨平台 V2 资源已处理（未部署）')
       }
       if (setup.payment?.createProducts) {
         if (!existsSync(secretsPath)) throw new Error('Waffo needs a gitignored local secrets file: ' + secretsPath)

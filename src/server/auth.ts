@@ -74,6 +74,7 @@ export interface SignInProfile {
   name: string | null
   picture: string | null
   googleSub: string | null
+  emailLoginEnabled?: boolean
   country: string | null
   locale: string | null
   attribution?: RequestAttribution | null // 仅新用户注册时写入
@@ -122,9 +123,9 @@ export async function upsertUser(env: Env, profile: SignInProfile): Promise<User
   const statements = [
     db
       .prepare(
-        `INSERT INTO users (id, email, name, avatar_url, google_sub, role, status, credits, locale, country,
+        `INSERT INTO users (id, email, name, avatar_url, google_sub, email_login_enabled, role, status, credits, locale, country,
          signup_source, signup_medium, signup_campaign, signup_device, attribution, created_at, last_login_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'active', 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         id,
@@ -132,6 +133,7 @@ export async function upsertUser(env: Env, profile: SignInProfile): Promise<User
         profile.name,
         profile.picture,
         profile.googleSub,
+        profile.emailLoginEnabled ? 1 : 0,
         role ?? 'user',
         profile.locale,
         profile.country ?? profile.attribution?.country ?? null,
@@ -172,6 +174,7 @@ export function publicUser(user: UserRow) {
     email: user.email,
     name: user.name,
     avatarUrl: user.avatar_url,
+    emailLoginEnabled: user.email_login_enabled === 1,
     role: user.role,
     credits: user.credits,
     createdAt: user.created_at,

@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState, type FormEvent } from 'react'
 import { ErrorText, GoogleIcon, LocalLink, LogoMark, Spinner } from '#/components/ui'
+import { EmailCodeForm } from '#/components/EmailCodeForm'
 import { api, errorCode } from '#/lib/api'
 import { getContent, localeFromParam, pageHead, useContent, useLocalePath } from '#/lib/i18n'
 import { safeRedirectPath } from '#/lib/redirect'
@@ -67,8 +68,16 @@ function SignInPage() {
             <GoogleIcon /> {t.google}
           </a>
         ) : (
-          <p className="text-sm text-muted">{t.notConfigured}</p>
+          config?.emailLogin ? null : <p className="text-sm text-muted">{t.notConfigured}</p>
         )}
+        {config?.emailLogin ? (
+          <div className="border-t border-line pt-5">
+            <EmailCodeForm purpose="login" onSuccess={async () => {
+              await refresh()
+              location.href = redirect
+            }} />
+          </div>
+        ) : null}
         {config?.devLogin ? (
           <form onSubmit={devLogin} className="space-y-3 border-t border-line pt-6 text-left">
             <p className="text-xs font-semibold tracking-wide text-muted uppercase">{t.devTitle}</p>

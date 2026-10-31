@@ -28,7 +28,8 @@
 | `STRIPE_PRODUCTS` | JSON，值是 Price ID，如 `{"starter":"price_xxx"}` | 用 Stripe 时 | 积分包用一次性价格，订阅套餐用 recurring 价格。`scripts/stripe-setup.mjs` 可以生成 |
 | `VIDEO_PROVIDER` | `fal`、`yir`、`nanoapi`、`kie`、`mock` | 是 | 模型和单价在 `site.video` 里配置；Kie.ai 使用 `site.video.kie` 的 Seedance 2.0 Mini 参数 |
 | `MODERATION_PROVIDER` | `openai`、`none`、`mock` | 是 | 上传图片的审核方式。`none` 不审核，检查时给出警告 |
-| `GOOGLE_CLIENT_ID` | OAuth Client ID | 是 | 站点只有 Google 登录，留空就没人能登录 |
+| `GOOGLE_CLIENT_ID` | OAuth Client ID | Google 登录开启时 | Google 与邮箱双登录时保留；邮箱登录已启用且可正常发信时可以留空 | 
+| `EMAIL_LOGIN_ENABLED` | `true` / `false` | 是 | 默认 `false`；先应用 `0016_email_login.sql`、验证邮件服务和 Turnstile 后才改为 `true` |
 | `UMAMI_ORIGIN` | 不带路径的 https 地址，如 `https://umami.example.com` | 否 | Umami 实例地址，留空则不代理。只在 Worker 端使用（`/s/script.js`、`/s/api/send` 同域代理），不进前端，页面源码里看不到实例域名；格式不对时检查给出警告。实例要带 GeoLite2 数据库（Vercel 上部署时设 `BUILD_GEO=1` 再重新部署）：代理把访客 IP 放进 `payload.ip`，Umami 据此查国家，没有数据库会返回 500。只有 `APP_ENV=production` 才转发上报和取脚本（其它环境 `/s/script.js` 返回空 JS），`/admin` 页面不转发 |
 | `TURNSTILE_SITE_KEY` | 站点密钥 | 否 | 留空则留言和举报表单不做人机校验，检查时给出警告 |
 | `ADMIN_EMAILS` | 逗号分隔的邮箱 | 是 | 这些邮箱登录时自动成为管理员，同时接收举报、留言提醒和系统告警。从列表里删掉不会撤销管理员角色 |
@@ -83,3 +84,13 @@
 3. 运行 `npm run cf:types`，重新生成 `worker-configuration.d.ts`。没写进 `.dev.vars` 的可选 secret，在 `src/env.d.ts` 里手动补上类型。
 4. 在 `src/server/config-health.ts` 里加上线检查规则，在 `tests/unit/config-health.test.ts` 里加用例。
 5. 更新本文件。
+
+## Google + 邮箱双登录（兼容迁移）
+
+- 先备份 D1，应用新增的 0016_email_login.sql。原用户 id、google_sub、积分、订单及会话不变，老 Google 用户 email_login_enabled 默认为 0。
+- 配置可向真实用户投递的 EMAIL_FROM（建议已验证的 Resend 发信域）、RESEND_API_KEY、Turnstile 的 Site Key 和 Secret。
+- 在 wrangler.jsonc 将 EMAIL_LOGIN_ENABLED 改为 true，重新构建并部署。默认 false 为安全关闭状态。
+- 新邮箱用户通过 8 位、10 分钟有效的一次性验证码注册；已有 Google 用户必须先 Google 登录并在“账户设置”验证自己的邮箱后，才允许用验证码登录同一个账号。
+- 旧 Google 账号不会因仅收到 OTP 就自动绑定；管理员账户仍只允许 Google 登录。登录后沿用原 sessions 和 users.id，不迁移历史订单/积分。
+- 请在正式收费前测试：验证码错误/过期/重放、邮件不可达、Email Service 配额、邮件枚举与限流、Google/Email 绑定后仍拥有原积分和订单；以及账户注销后验证码失效。
+

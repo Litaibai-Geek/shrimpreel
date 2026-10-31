@@ -203,6 +203,8 @@ export async function runEmailMaintenance(env: Env) {
       console.error('email retry failed', id, error)
     }
   }
+  await env.DB.prepare('DELETE FROM email_login_challenges WHERE expires_at < ?')
+    .bind(new Date(Date.now() - 24 * 3600_000).toISOString()).run()
   await env.DB.prepare('DELETE FROM email_outbox WHERE created_at < ?')
     .bind(new Date(Date.now() - OUTBOX_RETENTION_DAYS * 86400_000).toISOString())
     .run()

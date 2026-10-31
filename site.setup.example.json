@@ -19,5 +19,19 @@
   "secrets": {
     "file": ".dev.vars.production",
     "sync": true
+  },
+  "platforms": {
+    "cloudflare": {
+      "accountId": "",
+      "zoneId": "",
+      "turnstile": false,
+      "analytics": false
+    },
+    "resend": {
+      "enabled": false,
+      "dns": false,
+      "allowMx": false,
+      "createSendingKey": false
+    }
   }
 }

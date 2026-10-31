@@ -14,6 +14,7 @@ import { CLIENT_ERROR_PATH, summarizeClientError } from './client-error'
 import { clawbackStatements, expireStatements, ledgerStatements } from './credits'
 import { CSP_REPORT_PATH, summarizeCspReports } from './csp'
 import { exchangeGoogleCode, googleAuthRedirect, googleClientId, googleOAuthConfig, verifyGoogleIdToken } from './google'
+import { consumeEmailCode, emailLoginAvailable, normalizedLoginEmail, requestEmailCode } from './email-auth'
 import { publicGeneration, publicOrder, rateLimit, readJson, requireUser, pageParams } from './http'
 import { enqueueJob, failGeneration, handleDeadLetter, handleVideoJob } from './jobs'
 import { jobToken, serveR2Object, sniffImageType, verifyUploadSignature } from './media'
@@ -116,6 +117,7 @@ app.get('/api/me', async (c) => {
     user: user ? publicUser(user) : null,
     config: {
       googleClientId: googleClientId(c.env) ?? null,
+      emailLogin: emailLoginAvailable(c.env),
       devLogin: !isProduction(c.env),
       paymentProvider: settings.paymentProvider || c.env.PAYMENT_PROVIDER,
       turnstileSiteKey: turnstileSiteKey(c.env),
@@ -212,6 +214,40 @@ app.post('/api/auth/google/one-tap', async (c) => {
   })
   await startSession(c, user.id)
   return c.json({ user: publicUser(user) })
+})
+
+// Email verification is separate from Google auth; existing Google accounts
+// must explicitly opt in while signed in. Neither endpoint logs OTP codes.
+app.post('/api/auth/email/request', async (c) => {
+  const { email, purpose, locale, turnstileToken } = await readJson<{
+    email: string; purpose: 'login' | 'enable'; locale: string; turnstileToken: string
+  }>(c)
+  await rateLimit(c.env.AUTH_LIMITER, 'email-ip:' + (c.req.header('cf-connecting-ip') ?? 'local'))
+  const cleaned = normalizedLoginEmail(email)
+  if (!cleaned) throw new ApiError(400, 'invalid_email')
+  await rateLimit(c.env.AUTH_LIMITER, 'email-address:' + await sha256Hex(cleaned))
+  await verifyTurnstile(c.env, turnstileToken, c.req.header('cf-connecting-ip'))
+  const result = await requestEmailCode(c.env, {
+    email: cleaned, purpose: purpose ?? 'login', user: c.get('user'), locale,
+  })
+  c.header('Cache-Control', 'no-store')
+  return c.json(result)
+})
+
+app.post('/api/auth/email/verify', async (c) => {
+  await rateLimit(c.env.AUTH_LIMITER, 'email-verify:' + (c.req.header('cf-connecting-ip') ?? 'local'))
+  const { challengeId, code, locale } = await readJson<{
+    challengeId: string; code: string; locale: string
+  }>(c)
+  const result = await consumeEmailCode(c.env, {
+    challengeId, code, user: c.get('user'), locale,
+    country: c.req.header('cf-ipcountry') ?? null,
+    attribution: requestAttribution(c, 'first'),
+    referral: await requestReferral(c),
+  })
+  if (!result.linked) await startSession(c, result.user.id)
+  c.header('Cache-Control', 'no-store')
+  return c.json({ user: publicUser(result.user), linked: result.linked })
 })
 
 // 本地快捷登录（e2e 依赖它）；生产环境或经隧道/公网访问时 404
@@ -910,6 +946,7 @@ app.delete('/api/account', async (c) => {
     db.prepare('DELETE FROM generations WHERE user_id = ?').bind(user.id),
     db.prepare('DELETE FROM uploads WHERE user_id = ?').bind(user.id),
     db.prepare('DELETE FROM email_outbox WHERE user_id = ?').bind(user.id),
+    db.prepare('DELETE FROM email_login_challenges WHERE email = ? OR user_id = ?').bind(user.email, user.id),
     ...clawbackStatements(db, {
       userId: user.id,
       maxAmount: 1_000_000_000, // 全部剩余积分
@@ -918,7 +955,7 @@ app.delete('/api/account', async (c) => {
     }),
     db
       .prepare(
-        `UPDATE users SET email = ?, name = NULL, avatar_url = NULL, google_sub = NULL, status = 'deleted' WHERE id = ?`,
+        `UPDATE users SET email = ?, name = NULL, avatar_url = NULL, google_sub = NULL, email_login_enabled = 0, status = 'deleted' WHERE id = ?`,
       )
       .bind(`deleted+${user.id}@deleted.invalid`, user.id),
     db

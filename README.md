@@ -37,6 +37,10 @@ A 72-second tour, no sound ([Chinese version](README.zh-CN.md); MP4 files in [do
 
 Release notes: [CHANGELOG.md](CHANGELOG.md). Feature notes and plans: [docs/SAAS_VIDEO_FEATURES.md](docs/SAAS_VIDEO_FEATURES.md) and [ROADMAP.md](ROADMAP.md). SEO rules, keyword planning and audit results: [docs/SEO_AUDIT.md](docs/SEO_AUDIT.md). All environment variables and the launch-related `site.ts` fields: [docs/env.md](docs/env.md). Adding a payment provider and the webhook response-code contract: [docs/payments.md](docs/payments.md). The subscription switch, plans and provider setup: [docs/subscriptions.md](docs/subscriptions.md). Conventions to follow before changing code (credits, payment fulfillment, bilingual copy, migrations, e2e): [AGENTS.md](AGENTS.md). The docs/ files and AGENTS.md are in Chinese.
 
+## Google and email sign-in
+
+Google sign-in remains unchanged. Optional email OTP sign-in is guarded by `EMAIL_LOGIN_ENABLED=false` until migration `0016_email_login.sql` and verified sending/Turnstile are ready. Legacy Google users must opt in from Settings using their existing session; an OTP alone never links an old Google account. See [environment setup](docs/env.md).
+
 ## Fast Cloudflare setup for a new site
 
 After running `scripts/new-site.mjs` for new keywords and replacing the site-specific media/copy, use `scripts/bootstrap-site.mjs` to provision D1, R2, KV and Queues safely. Copy `site.setup.example.json` to gitignored `site.setup.json` and fill the public settings; put secrets only in `.dev.vars.production`.
@@ -47,7 +51,7 @@ npm run setup -- --apply
 npm run setup -- --verify
 ```
 
-No automatic deployment or secret overwrites. See [V1 bootstrap guide](docs/bootstrap-site.md) for Waffo, initial-Worker limitations, and optional migration flags.
+No automatic deployment or secret overwrites. With platforms enabled in site.setup.json, `npm run setup -- --apply` also runs V2 platform provisioning. See [V1 bootstrap guide](docs/bootstrap-site.md) and [V2 guide](docs/bootstrap-v2.md).
 
 ## Demo media
 

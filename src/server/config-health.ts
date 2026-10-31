@@ -95,9 +95,20 @@ export function checkConfig(input: ConfigInput): ConfigIssue[] {
   const missingBindings = REQUIRED_BINDINGS.filter((name) => !input.bindings.includes(name))
   if (missingBindings.length) error('bindings', `缺少绑定：${missingBindings.join('、')}`)
 
-  // 只有 Google 登录：不配就没人能登录
-  if (!vars('GOOGLE_CLIENT_ID')) error('GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_ID 为空：站点只有 Google 登录，用户无法登录')
-  else requireSecrets(['GOOGLE_CLIENT_SECRET'], 'Google 登录')
+  // Google is optional for a future email-only site, but the default remains
+  // Google-only until email login is explicitly enabled after its migration.
+  const emailAuth = vars('EMAIL_LOGIN_ENABLED') === 'true'
+  if (!vars('GOOGLE_CLIENT_ID') && !emailAuth) error('GOOGLE_CLIENT_ID', 'Google 与邮箱登录均未配置，用户无法登录')
+  if (vars('GOOGLE_CLIENT_ID')) requireSecrets(['GOOGLE_CLIENT_SECRET'], 'Google 登录')
+  if (emailAuth) {
+    if (!vars('EMAIL_FROM')) error('EMAIL_FROM', '启用邮箱登录需要已验证的发件地址')
+    if (!vars('TURNSTILE_SITE_KEY')) error('TURNSTILE_SITE_KEY', '邮箱验证码登录需要 Turnstile 防止验证码邮件滥用')
+    requireSecrets(['TURNSTILE_SECRET_KEY'], '邮箱登录 Turnstile')
+    // Worker Paid + Email Service can also send, but Resend is the recommended
+    // cross-site provider for inexpensive independent sites.
+    const hasResend = input.secrets.RESEND_API_KEY === true || Boolean(text(input.secrets.RESEND_API_KEY as string | undefined))
+    if (!hasResend) warn('RESEND_API_KEY', '邮箱登录未配置 Resend，请确认 Cloudflare Email Service 能向所有用户真实发信')
+  }
 
   const sessionSecret = input.secrets.SESSION_SECRET
   if (typeof sessionSecret === 'string' && text(sessionSecret) && isWeakSessionSecret(text(sessionSecret))) {

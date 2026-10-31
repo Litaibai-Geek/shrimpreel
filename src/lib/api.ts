@@ -51,6 +51,7 @@ export type PublicUser = {
   email: string
   name: string | null
   avatarUrl: string | null
+  emailLoginEnabled?: boolean
   role: 'user' | 'admin'
   credits: number
   createdAt: string
@@ -58,6 +59,7 @@ export type PublicUser = {
 
 export type ClientConfig = {
   googleClientId: string | null
+  emailLogin: boolean
   devLogin: boolean
   paymentProvider: string
   turnstileSiteKey: string | null

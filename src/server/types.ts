@@ -7,6 +7,7 @@ export interface UserRow {
   name: string | null
   avatar_url: string | null
   google_sub: string | null
+  email_login_enabled?: number
   role: UserRole
   status: UserStatus
   credits: number

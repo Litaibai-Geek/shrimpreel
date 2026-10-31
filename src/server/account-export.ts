@@ -8,7 +8,7 @@ import { nowIso } from './util'
 // 媒体文件本身不打包，保留期内可在个人中心逐个下载。
 const QUERIES = {
   account: `SELECT id, email, name, avatar_url AS avatarUrl, status, credits, locale, country, created_at AS createdAt,
-      last_login_at AS lastLoginAt, signup_source AS signupSource, signup_medium AS signupMedium,
+      last_login_at AS lastLoginAt, email_login_enabled AS emailLoginEnabled, signup_source AS signupSource, signup_medium AS signupMedium,
       signup_campaign AS signupCampaign, signup_device AS signupDevice, attribution, referral_code AS referralCode
     FROM users WHERE id = ?1`,
   sessions: `SELECT created_at AS createdAt, expires_at AS expiresAt, user_agent AS userAgent, ip
