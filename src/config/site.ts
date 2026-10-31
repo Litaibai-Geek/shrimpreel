@@ -188,16 +188,16 @@ export const site = {
   // cover 可选：public/ 下 1200×630 的图片路径，用在列表卡片、文章顶部、og:image 和 Article 的 image；
   // 用 scripts/article-cover.mjs 从站点自己的视频截帧生成（带标题、标签，可选多种版式）。不填时卡片没有图，og:image 用站点默认图
   articles: [
-    { key: 'trend', slug: 'tiny-desk-ai-trend', publishedAt: '2026-10-30', updatedAt: '2026-10-30' },
-    { key: 'howTo', slug: 'how-to-make-tiny-desk-ai-video', publishedAt: '2026-10-30', updatedAt: '2026-10-30' },
+    { key: 'trend', slug: 'tiny-desk-ai-trend', publishedAt: '2026-10-30', updatedAt: '2026-10-31' },
+    { key: 'howTo', slug: 'how-to-make-tiny-desk-ai-video', publishedAt: '2026-10-30', updatedAt: '2026-10-31' },
   ],
 
   seo: {
     // 长尾词：不输出 meta keywords（Google 不用），由 npm run seo:check 检查首页正文是否覆盖
-    secondaryKeywords: ['Tiny Desk AI generator', 'Tiny Desk AI video generator', 'Tiny Desk AI video from a photo', 'how to make a Tiny Desk AI video', 'AI Tiny Desk performance', 'Tiny Desk-style AI video'],
+    secondaryKeywords: ['Tiny Desk AI generator', 'Tiny Desk AI video generator', 'Tiny Desk AI video from a photo', 'how to make a Tiny Desk AI video', 'AI Tiny Desk performance', 'Tiny Desk-style AI video', 'Outstanding Tiny Desk AI'],
     // 首次上线日期与站点页面（首页、价格、法律页等）最近一次内容更新日期：首页视频 uploadDate、sitemap lastmod。文章用各自的日期
     publishedAt: '2026-10-30',
-    updatedAt: '2026-10-30',
+    updatedAt: '2026-10-31',
     // Search Console / Bing Webmaster 选“HTML 标记”验证时填 content 值；用 DNS 验证则留空
     googleVerification: '',
     bingVerification: '',

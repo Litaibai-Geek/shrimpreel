@@ -166,7 +166,7 @@ export function Generator({ styleId: controlledStyleId, onStyleChange }: { style
               <span className="space-y-1">
                 <span className="flex items-center gap-1.5 text-sm font-semibold">
                   {uploading ? <Spinner /> : <CircleCheck className="size-4 text-emerald-600" />}
-                  {uploading ? g.uploading : g.uploaded}
+                  {uploading ? g.uploading : photo.uploadId ? g.uploaded : g.localPhotoReady}
                 </span>
                 <span className="block text-xs text-muted underline">{g.change}</span>
               </span>
@@ -182,6 +182,7 @@ export function Generator({ styleId: controlledStyleId, onStyleChange }: { style
           )}
         </button>
         <p className="text-xs leading-5 text-muted">{g.guidance}</p>
+        {!user && photo ? <p className="text-xs leading-5 text-muted" role="status">{g.signInNote}</p> : null}
       </section>
 
       {/* 2. 风格：只有一种风格时不显示 */}
@@ -262,7 +263,7 @@ export function Generator({ styleId: controlledStyleId, onStyleChange }: { style
             <Spinner />
           </div>
         ) : !user ? (
-          <a href={signInHref(config, pathname, lp('/sign-in'))} className="btn-primary w-full py-3.5" data-testid="generator-sign-up">
+          <a href={signInHref(config, `${pathname}#create`, lp('/sign-in'))} className="btn-primary w-full py-3.5" data-testid="generator-sign-up">
             <GoogleIcon /> {g.ctaSignUp}
           </a>
         ) : shortfall > 0 && coverPack ? (

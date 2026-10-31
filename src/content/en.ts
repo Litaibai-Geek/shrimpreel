@@ -29,7 +29,7 @@ export function en(s: S) {
     styles,
     meta: {
       homeTitle: 'Tiny Desk AI Video Generator from a Photo',
-      homeDescription: 'Create a Tiny Desk AI video from a photo. Upload a portrait, choose a 6, 12 or 15-second reference clip, and make a vertical performance-style video.',
+      homeDescription: 'Create a Tiny Desk AI video from one photo. Pick 6, 12 or 15 seconds; get an original vertical desk-session clip. No video upload required.',
       pricingTitle: `Pricing – ${b}`,
       pricingDescription: subs
         ? `Credit packs and monthly or yearly plans for ${k} AI videos. Pack credits never expire, cancel a plan anytime, failed renders are refunded automatically.`
@@ -66,7 +66,7 @@ export function en(s: S) {
     },
     hero: {
       title: `${k} AI Video Generator`,
-      subtitle: 'Create a Tiny Desk AI video from a photo. A reference clip guides movement and framing while your portrait provides the person featured in the generated desk-session-style performance.',
+      subtitle: 'Turn one authorized portrait into a Tiny Desk-inspired AI performance. Choose 6, 12 or 15 seconds; the motion reference is supplied automatically. Learn about the Outstanding Tiny Desk AI trend below.',
       badge: 'Desk-session video creator',
       original: 'Reference clip',
       aiVersion: 'Performance preview',
@@ -82,14 +82,16 @@ export function en(s: S) {
       guidance: 'For the clearest result, use a sharp photo of one adult facing the camera, with the face unobstructed and the upper body visible. Avoid group photos, sunglasses, masks and heavy filters. No video upload is needed; the performance reference clip is provided automatically.',
       change: 'Change photo',
       uploading: 'Uploading…',
-      uploaded: 'Photo ready',
+      uploaded: 'Photo uploaded',
+      localPhotoReady: 'Photo selected',
+      signInNote: 'After Google sign-in, please select your photo again. For privacy, local photo files are not carried across the login redirect.',
       stepStyle: 'Performance scene',
       stepLength: 'Clip length',
       seconds: (n: number) => `${n} s`,
       full: 'full',
       creditsLabel: (n: number) => `${n} credits`,
       consent: 'This photo is of me, or I have permission from the adult person in it. They are 18 or older and not a celebrity or public figure.',
-      ctaSignUp: 'Sign up free and start',
+      ctaSignUp: 'Sign in to continue',
       ctaGenerate: (n: number) => `Generate video · ${n} credits`,
       ctaBuy: 'Get credits to generate',
       ctaBuyPack: (credits: number, price: string) => `Get ${credits} credits · ${price}`,
@@ -152,7 +154,7 @@ export function en(s: S) {
       eyebrow: 'The format',
       title: `What is a ${k} AI video?`,
       paragraphs: [
-        'A Tiny Desk AI video is a short, AI-generated performance-style clip with an intimate, desk-side music-session look. The focus is on close framing and a performer in a compact setting—not a large concert stage. It is a creative visual edit, not a live recording.',
+        'The Outstanding Tiny Desk AI meme popularized AI edits of a tightly framed desk-band setting in October 2026. This site makes an original one-person performance-style clip rather than reproducing NPR footage or the copyrighted Outstanding recording.',
         `The Tiny Desk AI generator on ${b} uses a portrait and a reference performance clip to create a new vertical video. The reference guides movement and framing; the portrait guides the person shown. Results vary, so inspect the video before sharing. This is an independent tool, not an official concert production.`,
       ],
       guide: 'Read how the desk-session AI format works',
@@ -184,7 +186,7 @@ export function en(s: S) {
       title: subs ? 'Pay as you go, or subscribe' : 'Pay once, use whenever',
       subtitle: subs
         ? '1 credit = 1 second of video. Buy a pack that never expires, or subscribe for a fresh allowance every month.'
-        : '1 credit = 1 second of video. No subscription, no expiry.',
+        : 'A 15-second video uses 15 credits. One-time credit packs never expire; no subscription required.',
       popular: 'Most popular',
       // 锚定价（site.packages[].anchorPriceCents）的划线原价和折扣
       was: 'Regular price',
@@ -227,7 +229,9 @@ export function en(s: S) {
       body: 'Need help with a render or payment? Contact our team.',
       cta: 'Contact support',
       items: [
-        { q: 'What is a Tiny Desk AI video?', a: 'It is an AI-generated, desk-session-style performance video made from a portrait and a reference clip. It is not a real live recording or an official Tiny Desk Concert production.', guide: { article: 'trend', label: 'How the desk-session AI format works' } },
+        { q: 'What is the Outstanding Tiny Desk AI trend?', a: 'It is an October 2026 AI parody trend inspired by the desk-band setting of Charlie Wilson’s 2023 NPR Tiny Desk performance of Outstanding. Our independent one-photo generator makes a new desk-session-style video rather than reproducing the original show or song.', guide: { article: 'trend', label: 'Learn the origin of the Outstanding Tiny Desk meme' } },
+        { q: 'Does this use the original Outstanding song?', a: 'No. The generator requests AI-created audio and does not include the original Charlie Wilson recording or guarantee a particular song.' },
+        { q: 'Can I upload five different performers?', a: 'Not yet. This generator currently supports one authorized adult portrait and a single desk-session style, with 6, 12 or 15-second output.' },
         { q: 'What photo works best?', a: 'Use a sharp, front-facing photo of one adult with the face unobstructed and the upper body visible. Avoid group photos, sunglasses, masks and heavy filters.', guide: { article: 'howTo', label: 'Photo tips for a Tiny Desk AI video' } },
         { q: 'Is Tiny Desk AI affiliated with NPR?', a: 'No. Tiny Desk AI is an independent creative tool and is not affiliated with NPR, the Tiny Desk Concert series, any artist, venue or rights holder.' },
         { q: 'Will the generated video match my photo perfectly?', a: 'No AI video can guarantee an exact result. Motion, hands, instruments, clothing and facial details may vary. Review the MP4 before sharing.' },
@@ -477,7 +481,7 @@ export function en(s: S) {
       title: 'Tiny Desk AI guides',
       metaTitle: 'Tiny Desk AI Video Guides – Tiny Desk AI',
       description: 'Practical guides to the Tiny Desk AI video format, choosing a portrait, selecting a clip length and reviewing an AI-generated result.',
-      intro: 'Learn how the portrait-to-video workflow works, what to prepare before generating, and what to check before sharing your clip.',
+      intro: 'Explore the Outstanding Tiny Desk AI trend, then learn how to make an original desk-session clip from one photo, choose an output duration and review your result.',
       related: 'Related guides',
     },
     errors: {
@@ -613,25 +617,53 @@ export function en(s: S) {
     },
     articles: {
       trend: {
-        title: 'What Is a Tiny Desk AI Video?',
-        description: 'What the desk-session AI video format means, how a portrait and reference clip work together, and what to review before sharing.',
-        intro: 'A Tiny Desk AI video is a short performance-style visual made with AI. Here, the phrase describes a compact, desk-side music-session look created from a portrait and a reference clip—not a live recording or an official concert video.',
+        title: 'Outstanding Tiny Desk AI Trend Explained',
+        description: 'Where the Outstanding Tiny Desk AI meme came from, why the desk-band edits went viral in October 2026, and what this one-photo generator can do.',
+        intro: 'The Outstanding Tiny Desk AI trend is a viral AI parody format, not a new concert. It draws on a real 2023 NPR Music desk performance and uses unexpected faces in band scenes. This site offers an independent, one-photo desk-session-style AI video, not an exact copy of that concert or its soundtrack.',
         sections: [
-          { h: 'What the desk-session look means', p: ['The visual idea is intimate rather than arena-sized: a performer stays close to the camera in a compact room or desk-side setup. A microphone, instrument or simple background may help establish the scene when those elements are present in the reference footage.', 'The phrase “Tiny Desk AI” describes the creative style users are looking to make here. It should not be confused with an official program, a real concert recording or an endorsement by any broadcaster, artist or venue.'] },
-          { h: 'How a portrait becomes an AI performance clip', p: ['The workflow starts with two visual ingredients: a portrait of the person to feature and a reference performance clip. The reference provides movement and framing cues; the portrait provides the visual identity for the generated subject.', 'The model creates a new video rather than documenting a real performance. Results can vary across frames, especially around hands, instruments, clothing and fine facial details. Always review the full clip before posting it.'] },
-          { h: 'What to prepare before you generate', p: ['Choose a sharp, front-facing photo of one adult. Keep the face unobstructed and include enough of the upper body for the scene. Group photos, sunglasses, masks and strong filters make it harder to produce a coherent result.', 'Only upload your own photo or an adult’s photo when you have their permission. Do not use images of minors, celebrities or public figures. Use source footage and any music or other creative material only when you have the rights or permission to do so.'] },
-          { h: 'Create a Tiny Desk AI video with a portrait', p: [`On ${b}, upload a portrait, choose a 6, 12 or 15-second clip length and start the render. When processing is complete, watch the result from beginning to end, check for visual artifacts and download the MP4 if it is ready to share.`, 'When posting, describe the clip as AI-generated. Do not present it as a real live session or imply that the person, broadcaster, venue or rights holder endorsed it.'] },
+          { h: 'What is the Outstanding Tiny Desk AI trend?', p: [
+            'NPR Music published Charlie Wilson: Tiny Desk Concert on June 5, 2023. The set closes with Outstanding, a song associated with The Gap Band. The crowded room, musicians, microphones and close camera framing make that live performance memorable.',
+            'In October 2026, AI parodies began circulating that put unexpected people into a desk-band scene. Sports-themed edits featuring college football coaches became a widely shared version of the joke. These clips are edited or AI-generated parodies, not recordings of those people performing at NPR.'
+          ] },
+          { h: 'Why the October 2026 meme spread', p: [
+            'The joke comes from a contrast: people who have had a rough day appear to be joyfully performing a song called Outstanding. The tight concert setting, reactions and musician close-ups make the format easy to recognize in a short social video.',
+            'Different edits highlight the lead singer, backing musicians, keyboard and saxophone. The original viral examples vary by creator, and reposted view counts or claims about the first upload should not be treated as verified facts without their original posts.'
+          ] },
+          { h: 'The video effect people are trying to make', p: [
+            'People looking for an Outstanding Tiny Desk AI template often want the recognizable ensemble scene: a desk-side band, expressive singing close-ups, warm studio lighting, keys and a saxophone moment. A five-person face-replacement edit is a different workflow from generating a new scene with a single portrait.',
+            'This website currently accepts one authorized adult portrait, offers one desk-session performance style, and lets you choose a 6, 12 or 15-second vertical output. It does not currently provide five separate cast slots, exact shot-by-shot recreation, or the original Outstanding recording.'
+          ] },
+          { h: 'How to make an original desk-session AI video', p: [
+            'Sign in with Google, select one clear portrait of yourself or an adult who gave permission, and choose the output length. You do not need to upload an additional video: the site supplies a motion-reference clip automatically.',
+            'Once rendering finishes, open My videos to play or download the MP4. The video model can change facial details, hands, instruments or timing between frames, so inspect the full result before sharing it.'
+          ] },
+          { h: 'Who owns the music and original concert?', p: [
+            'The original NPR Tiny Desk concert and the song Outstanding belong to their respective rights holders. This independent service does not supply the concert video, claim affiliation with NPR, or promise that its AI audio reproduces the original song.',
+            'Use music you are entitled to use when posting on TikTok, Instagram or elsewhere. Do not pass an AI parody off as a genuine performance, and do not upload images of minors, celebrities or public figures.'
+          ] },
         ],
       },
       howTo: {
-        title: 'How to Make a Tiny Desk AI Video',
-        description: 'A practical guide to making a desk-session-style AI video from one portrait, choosing a clip length and checking the MP4.',
-        intro: 'Prepare a Tiny Desk AI video in a few clear steps. The quality of the source portrait and reference clip matters, and every generated result should be reviewed before sharing.',
+        title: 'How to Make a Tiny Desk AI Video from a Photo',
+        description: 'Sign in, upload one portrait, select 6, 12 or 15 seconds, generate an original desk-session video and download your MP4. No video upload required.',
+        intro: 'You need one clear, permitted adult portrait. The motion-reference video is built into this generator, so you choose the output duration rather than uploading a clip. The final result is an AI-created performance, not the original Outstanding concert.',
         sections: [
-          { h: '1. Choose a clear portrait', p: ['Use a recent, sharp photo of one adult looking toward the camera. Even lighting, a visible face and an unobstructed upper body give the model more useful visual information.', 'Avoid group shots, sunglasses, masks, extreme angles and heavy beauty filters. Do not upload another person’s image unless they have explicitly agreed to this use.'] },
-          { h: '2. Select a reference clip length', p: ['Choose the 6, 12 or 15-second option that fits the moment you want to create. Shorter clips use fewer credits; one credit covers one second of generated video.', 'The reference clip guides the movement and framing. It is a visual guide for the AI output, not proof that the generated video records a real performance.'] },
-          { h: '3. Generate and review the result', p: ['Sign in, upload your portrait and confirm that you have the right to use the image. Start the render and wait for the job to finish. Processing time depends on the selected length, model availability and queue.', 'Watch the complete MP4 before sharing. Check the face, hands, clothing, microphone and instruments for visual changes or artifacts.'] },
-          { h: '4. Download and share responsibly', p: ['Download the finished MP4 from the generator or My videos. Keep the AI-generated disclosure when you post it and do not describe it as real concert footage.', 'Use only photos, reference clips, music and other materials that you own or are authorized to use. Respect the consent of the person shown and the rights of creators whose work appears in any source material.'] },
+          { h: '1. Sign in, then select your photo', p: [
+            'Sign in with Google to keep your uploaded photo and result in your own account. If you selected a photo before signing in, choose it again after returning; for privacy, the browser does not transfer your local file through the login redirect.',
+            'Use JPG, PNG or WebP up to 10 MB. A clear, well-lit portrait with the face visible and some upper body in the frame gives the model better reference information. Only use yourself or an adult who has agreed.'
+          ] },
+          { h: '2. Pick a generated-video length', p: [
+            'Choose 6, 12 or 15 seconds. Each output second costs one credit, so a 15-second render uses 15 credits. The reference-performance clip is selected by the site automatically; there is no separate user video-upload step.',
+            'The currently supported output is vertical 9:16. This is a single-person workflow, not a multi-cast video editor.'
+          ] },
+          { h: '3. Start the render and check progress', p: [
+            'Confirm permission to use the photo, ensure your account has sufficient credits, and submit the generation task. Video creation is asynchronous. You may leave the page and check My videos while the render is processing.',
+            'The model is asked to generate audio with the performance. Audio quality, lip movement and visual consistency can vary; the service does not promise any particular licensed song or an exact recreation of a viral meme.'
+          ] },
+          { h: '4. Review the MP4, download and share', p: [
+            'Watch the result from start to finish. Check the face, fingers, microphone, instruments, pacing and sound for visible or audible errors. A completed file can be downloaded from the generator or My videos.',
+            'Generated videos are retained for 30 days under the current site policy. Label the result as AI-generated and share only when you have the necessary rights. If a render fails, spent generation credits are automatically returned.'
+          ] },
         ],
       },
     } satisfies Record<ArticleKey, ArticleContent>,
