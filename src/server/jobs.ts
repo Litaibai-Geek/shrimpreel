@@ -117,11 +117,14 @@ async function submitGeneration(env: Env, generation: GenerationRow) {
 
   const duration = findDuration(generation.duration_id)
   const style = findStyle(generation.template_id)
-  // 已排队的旧 full 任务仍可能是 18 秒；新 full 档位改为 15 秒，保留旧素材映射以免误用 15 秒片段。
+  // Kie 的输出时长与参考输入时长独立；其他 provider 仍使用与输出长度匹配的源视频。
+  // 已排队的旧 full 任务仍可能是 18 秒，保留 legacyFull 兼容素材。
   const sourceFile = duration
-    ? generation.duration_seconds > duration.seconds
-      ? style?.sources.legacyFull
-      : style?.sources[duration.id]
+    ? generation.provider === 'kie'
+      ? style?.sources.reference
+      : generation.duration_seconds > duration.seconds
+        ? style?.sources.legacyFull
+        : style?.sources[duration.id]
     : undefined
   const upload = await env.DB.prepare('SELECT * FROM uploads WHERE id = ?').bind(generation.upload_id).first<UploadRow>()
   if (!duration || !style || !sourceFile || !upload || upload.expired_at) {

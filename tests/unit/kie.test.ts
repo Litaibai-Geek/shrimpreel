@@ -158,8 +158,8 @@ describe('Kie.ai Seedance 2.0 Mini：查询', () => {
     })
   })
 
-  it('成本估算按输入参考视频 + 输出视频计费：6 / 12 / 15 秒约 $0.30 / $0.60 / $0.75', () => {
-    expect([6, 12, 15].map(estimatedCostCents)).toEqual([30, 60, 75])
+  it('成本估算按 14 秒输入参考视频 + 输出视频计费：6 / 12 / 15 秒约 $0.50 / $0.65 / $0.73', () => {
+    expect([6, 12, 15].map(estimatedCostCents)).toEqual([50, 65, 73])
   })
 
   it('任务查询错误处理 HTTP 200 的业务错误码', async () => {

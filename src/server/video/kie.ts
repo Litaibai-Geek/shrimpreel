@@ -123,8 +123,13 @@ export function createKieProvider(env: Env): VideoProvider {
 
 export function estimatedCostCents(durationSeconds: number) {
   const config = site.video.kie
-  // Reference clip duration equals output duration for the site's 6 / 12 / 15-second presets.
-  return Math.round(durationSeconds * 2 * config.estimatedCreditsPerBillableSecond * config.usdPerCredit * 100)
+  // Kie bills both the 14s reference input and the selected output duration.
+  return Math.round(
+    (config.referenceVideoSeconds + durationSeconds) *
+      config.estimatedCreditsPerBillableSecond *
+      config.usdPerCredit *
+      100,
+  )
 }
 
 function actualCostCents(value: unknown): number | undefined {

@@ -2,6 +2,7 @@
 // 文案在 src/content/<locale>.ts，通过 {keyword} 等变量自动套用。
 
 import type { ThemeName } from '#/lib/theme'
+import { demoMedia } from './demo-media'
 
 export const LOCALES = ['en', 'zh'] as const
 export type Locale = (typeof LOCALES)[number]
@@ -26,7 +27,7 @@ export const site = {
   // 页面主题，可选值和效果见 src/lib/theme.ts
   theme: 'classic' as ThemeName,
 
-  // 生成模板的共用参数：provider 输出时长 = 源视频时长，所以每种风格的每个时长档位各有一段剪好的源视频（见 styles[].sources）。
+  // Kie 使用固定 14 秒参考视频；fal / yir / NanoAPI 继续使用与输出时长匹配的参考片段。
   template: {
     aspectRatio: '9:16',
     fullSeconds: 15,
@@ -40,28 +41,30 @@ export const site = {
       // 写入 generations.template_id，发布后不要改
       id: 'tiny-desk-v1',
       // 键 = durations[].id，每个档位都要有
-      // TODO(site): add original or licensed desk-session reference clips before production; these files are not in the repo yet.
-      sources: { short: 'tiny-desk-v1-6s.mp4', medium: 'tiny-desk-v1-12s.mp4', full: 'tiny-desk-v1-15s.mp4', legacyFull: 'tiny-desk-v1-18s.mp4' },
+      // 旧 provider 按输出时长匹配参考片段；Kie 单独使用 14 秒 reference。旧 18 秒任务保留兼容素材。
+      sources: {
+        short: 'tiny-desk-v1-6s.mp4',
+        medium: 'tiny-desk-v1-12s.mp4',
+        full: 'tiny-desk-v1-15s.mp4',
+        reference: 'tiny-desk-v1-reference-14s.mp4',
+        legacyFull: 'tiny-desk-v1-18s.mp4',
+      },
       // 这种风格的 prompt，覆盖 video.yir.prompt、video.nanoapi.prompt 和 video.kie.prompt；null = 用默认
       prompt: null as string | null,
       // yir 两步走（可选）：先用图片模型把照片里的人合成进源视频首帧，再拿合成图做动作参考，成片保留源视频的场景。
       // null = 单步，直接用用户照片做参考，背景会变成照片的背景。图片模型等共用参数在 video.yir.sceneImage
       scene: null as StyleScene | null,
-      // 首页展示素材（public/demo/）。必须是自有或已获授权素材，并在 credit 写明来源。
-      // TODO(site): replace inherited Neon Shuffle demo media with Tiny Desk AI examples before production.
+      // 首页展示 Pexels 授权的表演参考片段；明确标注为 stock footage，不冒充本站 AI 生成结果。
       examples: {
-        // 示例素材先留空；补充自有或授权素材后再填路径。
-        original: { video: '', poster: '', credit: '' },
-        aiVersions: [],
+        previews: [demoMedia.band, demoMedia.singer, demoMedia.sax],
+        // 真正的“上传照片 → AI 成片”案例，等 Kie 真实生成测试通过后再补。
         madeWith: { photo: '', video: '', poster: '' },
       },
     },
   ],
 
-  // 全站共用的首页展示素材
-  // TODO(site): replace inherited Neon Shuffle media in public/demo/ before production.
+  // 全站共用的首页创作场景文案；表演视频预览配置在 styles[].examples.previews。
   examples: {
-    // 首页示例视频位暂时留空，避免展示模板项目继承的旧演示素材。
     ideas: [],
   },
 
@@ -114,6 +117,8 @@ export const site = {
       generateAudio: true,
       usdPerCredit: 0.005,
       estimatedCreditsPerBillableSecond: 5,
+      // 固定参考视频 14 秒；成本估算按“输入参考视频秒数 + 输出视频秒数”计算。实际以 creditsConsumed 为准。
+      referenceVideoSeconds: 14,
       prompt: 'Use Image 1 as the identity reference for the main performer. Recreate the movements, choreography, gestures, timing, camera framing, and scene from Video 1. Replace the original performer in Video 1 with the person from Image 1 while preserving the reference video’s setting, background, lighting, camera movement, and overall composition. Keep the person’s face and identity consistent throughout. Do not add extra people or change the scene.',
     },
   },
@@ -244,6 +249,7 @@ export interface SubscriptionPlan {
 }
 
 export interface ExampleClip {
+  label: string
   video: string
   poster: string
   credit: string
@@ -251,12 +257,11 @@ export interface ExampleClip {
 
 export interface Style {
   id: string
-  sources: Readonly<Record<DurationOption['id'], string> & { legacyFull?: string }> // 键 = durations[].id；legacyFull 仅供旧 18 秒排队任务
+  sources: Readonly<Record<DurationOption['id'], string> & { reference: string; legacyFull?: string }> // 输出时长映射 + Kie 固定参考片 + 旧 18 秒兼容片
   prompt: string | null
   scene: StyleScene | null
   examples: {
-    original: ExampleClip
-    aiVersions: readonly ExampleClip[]
+    previews: readonly ExampleClip[]
     madeWith: { photo: string; video: string; poster: string }
   }
 }

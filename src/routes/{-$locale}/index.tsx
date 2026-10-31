@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
-import { ArrowRight, Camera, Check, Clock, Coins, Film, Flame, ShieldCheck, Smartphone, Sparkles, X } from 'lucide-react'
+import { ArrowRight, Camera, Check, Clock, Coins, Film, Flame, ShieldCheck, Smartphone, X } from 'lucide-react'
 import { Faq, faqJsonLd } from '#/components/Faq'
 import { Generator } from '#/components/Generator'
 import { Pricing } from '#/components/Pricing'
@@ -38,12 +38,12 @@ function Home() {
   // hero 标签和生成器共用同一个风格；SSR 默认显示默认风格（或 URL 指定的）
   const [styleId, setStyleId] = useState<string>(search.style ?? defaultStyle.id)
   const style = findStyle(styleId) ?? defaultStyle
-  const heroClips = [style.examples.original, ...style.examples.aiVersions].filter((clip) => clip.video && clip.poster)
+  const heroClips = style.examples.previews.filter((clip) => clip.video && clip.poster)
   const hasMadeWithExamples = STYLES.some((item) => item.examples.madeWith.photo && item.examples.madeWith.video && item.examples.madeWith.poster)
   const styleCopy = (id: string) => c.styles[id as keyof typeof c.styles]
   return (
     <>
-      {/* Hero：左侧生成器，右侧原版 vs AI 版对比 */}
+      {/* Hero：左侧生成器，右侧展示三段有授权的表演参考素材 */}
       <section className="relative overflow-hidden">
         <div className="hero-glow pointer-events-none absolute inset-0" aria-hidden />
         <div className="container-page relative grid gap-10 py-10 lg:grid-cols-[minmax(0,430px)_1fr] lg:gap-16 lg:py-14">
@@ -99,7 +99,7 @@ function Home() {
                     video={clip.video}
                     poster={clip.poster}
                     credit={clip.credit}
-                    label={index === 0 ? c.hero.original : <><Sparkles className="size-3" /> {c.hero.aiVersion}</>}
+                    label={clip.label}
                   />
                 ))
               ) : (

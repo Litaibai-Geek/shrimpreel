@@ -23,7 +23,8 @@
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
     "doctor": "node scripts/doctor.mjs",
     "deploy": "npm run doctor && npm run build && wrangler deploy",
-    "media:placeholder": "node scripts/generate-placeholder-media.mjs"
+    "media:placeholder": "node scripts/generate-placeholder-media.mjs",
+    "media:download": "node scripts/download-demo-media.mjs"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "1.64.0",

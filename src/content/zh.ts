@@ -62,9 +62,9 @@ export function zh(s: S): Content {
       subtitle: '用一张照片制作 Tiny Desk AI 视频。参考片段提供动作与镜头构图，人像照片决定生成画面中呈现的人物。',
       badge: '桌边现场风格视频生成器',
       original: '参考片段',
-      aiVersion: 'AI 预览',
+      aiVersion: '表演预览',
       chips: ['一张人物照片', '参考视频引导动作', '6 / 12 / 15 秒短片'],
-      creditNote: '示例视频位暂时留空，完成模型测试并准备好自有或已授权素材后再补充。',
+      creditNote: '这里展示的是 Pexels 授权表演参考素材，并非本站 AI 生成成片；实际生成视频会使用你上传的人像。',
     },
     generator: {
       title: '制作你的视频',

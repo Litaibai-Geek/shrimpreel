@@ -13,16 +13,21 @@ describe('site.styles', () => {
     expect(findStyle('no-such-style')).toBeUndefined()
   })
 
-  it('每个风格的 sources 覆盖所有时长档位，文件名不重复，并保留旧 18 秒 full 源片', () => {
-    const files: string[] = []
+  it('保留每个输出时长对应的源视频、Kie 固定 14 秒参考片、旧 18 秒兼容片和三个展示素材', () => {
     for (const style of STYLES) {
-      for (const d of site.durations) {
-        expect(style.sources[d.id], `${style.id} 缺 ${d.id} 的源视频`).toBeTruthy()
-        files.push(style.sources[d.id]!)
-      }
+      const files = site.durations.map((d) => style.sources[d.id])
+      expect(files.every(Boolean)).toBe(true)
+      expect(new Set(files).size).toBe(files.length)
+      expect(style.sources.reference, `${style.id} 缺 Kie 的 14 秒参考视频`).toBeTruthy()
       expect(style.sources.legacyFull, `${style.id} 缺旧 18 秒任务的兼容源视频`).toBeTruthy()
+      expect(style.examples.previews).toHaveLength(3)
+      for (const clip of style.examples.previews) {
+        expect(clip.label).toBeTruthy()
+        expect(clip.video).toBeTruthy()
+        expect(clip.poster).toBeTruthy()
+        expect(clip.credit).toContain('Pexels')
+      }
     }
-    expect(new Set(files).size).toBe(files.length)
   })
 
   it('每个风格在每种语言都有展示名和介绍', async () => {

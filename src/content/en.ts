@@ -69,9 +69,9 @@ export function en(s: S) {
       subtitle: 'Create a Tiny Desk AI video from a photo. A reference clip guides movement and framing while your portrait provides the person featured in the generated desk-session-style performance.',
       badge: 'Desk-session video creator',
       original: 'Reference clip',
-      aiVersion: 'AI preview',
+      aiVersion: 'Performance preview',
       chips: ['One portrait photo', 'Reference-guided motion', '6, 12 or 15 seconds'],
-      creditNote: 'Example video slots are intentionally empty until model testing is complete and original or licensed clips are ready.',
+      creditNote: 'Licensed Pexels performance footage is shown for visual reference only. These are not AI-generated TinyDeskAI results; your video is generated from your own portrait.',
     },
     generator: {
       // 只给读屏用（sr-only），不放关键词，避免隐藏文字堆词
