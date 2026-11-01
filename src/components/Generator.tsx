@@ -1,5 +1,5 @@
 import { useRouterState } from '@tanstack/react-router'
-import { CircleAlert, CircleCheck, Download, Upload } from 'lucide-react'
+import { ArrowRight, CircleAlert, CircleCheck, Clock3, Download, Upload } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { STYLES, cheapestPackageCovering, defaultStyle, formatPrice, site } from '#/config/site'
 import { BAND_MAX, BAND_MIN } from '#/lib/band'
@@ -31,6 +31,7 @@ export function Generator({ styleId: controlledStyleId, onStyleChange }: { style
   const bandUploadsRef = useRef(new Map<File, string>())
   const [photo, setPhoto] = useState<Photo | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [bandUploadProgress, setBandUploadProgress] = useState<{ current: number; total: number } | null>(null)
   const [dragging, setDragging] = useState(false)
   const [ownStyleId, setOwnStyleId] = useState<string>(defaultStyle.id)
   const styleId = controlledStyleId ?? ownStyleId
@@ -134,7 +135,8 @@ export function Generator({ styleId: controlledStyleId, onStyleChange }: { style
       let json: Record<string, unknown>
       if (mode === 'band') {
         const uploadIds: string[] = []
-        for (const item of bandPhotos) {
+        for (const [index, item] of bandPhotos.entries()) {
+          setBandUploadProgress({ current: index + 1, total: bandPhotos.length })
           let id = bandUploadsRef.current.get(item.file)
           if (!id) {
             id = await upload(item.file)
@@ -142,6 +144,7 @@ export function Generator({ styleId: controlledStyleId, onStyleChange }: { style
           }
           uploadIds.push(id)
         }
+        setBandUploadProgress(null)
         json = { mode: 'band', uploadIds, durationId, styleId, locale }
       } else {
         const uploadId = photo!.uploadId ?? (await upload(photo!.file))
@@ -156,6 +159,7 @@ export function Generator({ styleId: controlledStyleId, onStyleChange }: { style
       setError(errorCode(err))
       await refresh()
     } finally {
+      setBandUploadProgress(null)
       setSubmitting(false)
     }
   }
@@ -280,6 +284,8 @@ export function Generator({ styleId: controlledStyleId, onStyleChange }: { style
         {durationId === 'short' ? <p className="text-xs text-muted">{g.bandShortWarning}</p> : null}
       </section>
       )}
+
+      {bandUploadProgress ? <p role="status" className="flex items-center gap-2 text-sm text-muted" data-testid="band-upload-progress"><Spinner className="size-4" />{g.bandUploading(bandUploadProgress.current, bandUploadProgress.total)}</p> : null}
 
       {/* 2. 风格：只有一种风格时不显示 */}
       {STYLES.length > 1 ? (
@@ -431,13 +437,35 @@ function StepTitle({ n, children }: { n: number; children: string }) {
 function GenerationResult({ generation, onReset }: { generation: Generation; onReset: () => void }) {
   const g = useContent().generator
   const locale = useLocale()
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!isActiveGeneration(generation)) return
+    setNow(Date.now())
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [generation.id, generation.status])
+  const start = Date.parse(generation.createdAt)
+  const elapsed = Number.isFinite(start) ? Math.max(0, Math.floor((now - start) / 1000)) : null
+  const time = elapsed === null ? null : `${Math.floor(elapsed / 60).toString().padStart(2, '0')}:${(elapsed % 60).toString().padStart(2, '0')}`
   return (
     <div className="space-y-3 rounded-xl border border-line bg-bg-soft p-4" data-testid="generation-status" data-status={generation.status}>
       {isActiveGeneration(generation) ? (
-        <p className="flex items-start gap-2 text-sm">
-          <Spinner className="mt-0.5 size-4 shrink-0" />
-          {generation.status === 'queued' ? g.queued : g.processing}
-        </p>
+        <div className="space-y-4" data-testid="generation-waiting">
+          <div className="flex items-start gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-card text-fg ring-1 ring-line"><Spinner className="size-5" /></span>
+            <div className="min-w-0 space-y-1">
+              <p role="status" className="text-sm font-semibold text-fg">{generation.status === 'queued' ? g.queued : g.processing}</p>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+                {time !== null ? <span className="inline-flex items-center gap-1" data-testid="generation-elapsed"><Clock3 className="size-3.5" aria-hidden="true" />{g.elapsed(time)}</span> : null}
+                <span aria-hidden="true">·</span><span>{g.seconds(generation.durationSeconds)}</span>
+                <span aria-hidden="true">·</span><span>{g.creditsLabel(generation.creditsCost)}</span>
+              </div>
+            </div>
+          </div>
+          <div aria-hidden="true" className="flex items-center gap-1.5 text-muted"><span className="size-1.5 rounded-full bg-current animate-pulse motion-reduce:animate-none" /><span className="size-1.5 rounded-full bg-current animate-pulse motion-reduce:animate-none" /><span className="size-1.5 rounded-full bg-current animate-pulse motion-reduce:animate-none" /></div>
+          <p className="text-xs leading-5 text-muted">{elapsed !== null && elapsed >= 300 ? g.waitingLong : g.waitingBody}</p>
+          <LocalLink to="/dashboard" className="inline-flex items-center gap-1 text-sm font-semibold text-fg underline underline-offset-4" data-testid="generation-view-all">{g.viewAll}<ArrowRight className="size-4" aria-hidden="true" /></LocalLink>
+        </div>
       ) : generation.status === 'succeeded' && generation.videoUrl ? (
         <>
           <p className="flex items-center gap-2 text-sm font-semibold">
