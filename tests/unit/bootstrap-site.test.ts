@@ -112,8 +112,8 @@ describe('bootstrap-site', () => {
     expect(() => validateSetup({ ...setup, site: { ...setup.site, name: 'different-worker' } }, config)).toThrow('Worker name differs')
   })
   it('derives site identity but still rejects an explicit mismatch', () => {
-    const compact = normalizeSetup({ site: { adminEmail: 'admin@example.com' } }, config, 'tinydeskai.website')
-    expect(compact.site).toMatchObject({ name: config.name, domain: 'tinydeskai.website' })
+    const compact = normalizeSetup({ site: { adminEmail: 'admin@example.com' } }, config, 'example.com')
+    expect(compact.site).toMatchObject({ name: config.name, domain: 'example.com' })
     expect(() => validateSetup(normalizeSetup({ site: { domain: 'wrong.example' } }, config), config)).toThrow('site.domain differs')
   })
   it('plans without remote calls, writes, or secrets', async () => {

@@ -16,51 +16,51 @@ export const LOCALE_META: Record<Locale, { tag: string; ogLocale: string; name: 
 }
 
 export const site = {
-  keyword: 'Tiny Desk',
-  brandName: 'Tiny Desk AI',
-  logoMark: 'TD',
-  domain: 'tinydeskai.website',
-  supportEmail: 'support@tinydeskai.website',
+  keyword: 'Neon Shuffle',
+  brandName: 'Neon Shuffle AI',
+  logoMark: 'NS',
+  domain: 'example.com',
+  supportEmail: 'support@example.com',
   // 仅供管理员测试真实收款，由 site.setup.json 的开关同步。
-  testPaymentEnabled: true as boolean,
-  // 社媒平台名称（用于 “Viral on TikTok” 之类标签）
+  testPaymentEnabled: false as boolean,
+  // 社媒平台名称（用于 "Viral on TikTok" 之类标签）
   trendPlatform: 'TikTok',
   ogImage: '/og.png',
   // 页面主题，可选值和效果见 src/lib/theme.ts
-  theme: 'studio' as ThemeName,
+  theme: 'classic' as ThemeName,
 
   // Kie 使用固定 14 秒参考视频；fal / yir / NanoAPI 继续使用与输出时长匹配的参考片段。
   template: {
     aspectRatio: '9:16',
-    fullSeconds: 15,
+    fullSeconds: 18,
   },
 
-  // 表演场景：一个站点可以配置多种，第一个是默认场景；只有一种时界面不显示场景选择。
+  // 舞蹈风格：一个站点可以配多种，第一个是默认风格；只有一种时界面不显示风格选择。
   // 源视频上传到 R2 的 templates/<文件名>，由 /media/templates/<文件名> 公开提供给 provider 拉取。
   // 风格的展示名和一句话介绍写在 src/content/<locale>.ts 的 styles[id]（缺了 typecheck 报错）。
   styles: [
     {
       // 写入 generations.template_id，发布后不要改
-      id: 'tiny-desk-v1',
+      id: 'neon-shuffle-v1',
       // 键 = durations[].id，每个档位都要有
       // 旧 provider 按输出时长匹配参考片段；Kie 单独使用 14 秒 reference。旧 18 秒任务保留兼容素材。
       sources: {
-        short: 'tiny-desk-v1-6s.mp4',
-        medium: 'tiny-desk-v1-12s.mp4',
-        full: 'tiny-desk-v1-15s.mp4',
-        reference: 'tiny-desk-v1-reference-14s.mp4',
-        legacyFull: 'tiny-desk-v1-18s.mp4',
+        short: 'neon-shuffle-v1-6s.mp4',
+        medium: 'neon-shuffle-v1-12s.mp4',
+        full: 'neon-shuffle-v1-18s.mp4',
+        reference: 'neon-shuffle-v1-reference-14s.mp4',
+        legacyFull: 'neon-shuffle-v1-18s.mp4',
       },
       // 这种风格的 prompt，覆盖 video.yir.prompt、video.nanoapi.prompt 和 video.kie.prompt；null = 用默认
       prompt: null as string | null,
       // yir 两步走（可选）：先用图片模型把照片里的人合成进源视频首帧，再拿合成图做动作参考，成片保留源视频的场景。
       // null = 单步，直接用用户照片做参考，背景会变成照片的背景。图片模型等共用参数在 video.yir.sceneImage
       scene: null as StyleScene | null,
-      // 首页展示站长替换的真实 AI 生成样片；旧文件名保留。R2 的参考视频是另一份素材。
+      // 首页展示素材（public/demo/）。换成真实素材时必须拥有授权，credit 写原作者，例如 '@handle · TikTok'。
       examples: {
-        previews: [demoMedia.band, demoMedia.singer, demoMedia.sax],
+        previews: [demoMedia.demo1, demoMedia.demo2, demoMedia.demo3],
         // 输入照片 → AI 成片对比需取得对应原图与公开展示许可，不能用不相关图片充当输入图。
-        madeWith: { photo: '', video: '', poster: '' },
+        madeWith: { photo: '/demo/sample-photo.jpg', video: '/demo/madeWith.mp4', poster: '/demo/madeWith.jpg' },
       },
     },
   ],
@@ -76,7 +76,7 @@ export const site = {
     falModel: 'fal-ai/wan/v2.2-14b/animate/replace',
     resolution: '480p',
     // 成本估算，只用于后台毛利；实际扣费以 fal 账单为准。换模型、分辨率或源视频帧率时同步更新。
-    // fal 按帧计费：16 帧 = 1 个“视频秒”，480p $0.04/视频秒（https://fal.ai/models/fal-ai/wan/v2.2-14b/animate/replace）
+    // fal 按帧计费：16 帧 = 1 个"视频秒"，480p $0.04/视频秒（https://fal.ai/models/fal-ai/wan/v2.2-14b/animate/replace）
     costCentsPerVideoSecond: 4,
     sourceFps: 24,
     // yir.ai 网关（可选，VIDEO_PROVIDER=yir）：照片 + 源视频走 Kling Motion Control。prompt 按热词写清要保留什么。
@@ -119,20 +119,20 @@ export const site = {
       generateAudio: true,
       usdPerCredit: 0.005,
       estimatedCreditsPerBillableSecond: 5,
-      // 固定参考视频 14 秒；成本估算按“输入参考视频秒数 + 输出视频秒数”计算。实际以 creditsConsumed 为准。
+      // 固定参考视频 14 秒；成本估算按"输入参考视频秒数 + 输出视频秒数"计算。实际以 creditsConsumed 为准。
       referenceVideoSeconds: 14,
-      prompt: 'Use Image 1 as the identity reference for the main performer. Recreate the movements, choreography, gestures, timing, camera framing, and scene from Video 1. Replace the original performer in Video 1 with the person from Image 1 while preserving the reference video’s setting, background, lighting, camera movement, and overall composition. Keep the person’s face and identity consistent throughout. Do not add extra people or change the scene.',
+      prompt: 'Use Image 1 as the identity reference for the main performer. Recreate the movements, choreography, gestures, timing, camera framing, and scene from Video 1. Replace the original performer in Video 1 with the person from Image 1 while preserving the reference video\'s setting, background, lighting, camera movement, and overall composition. Keep the person\'s face and identity consistent throughout. Do not add extra people or change the scene.',
     },
   },
 
   durations: [
     { id: 'short', seconds: 6, credits: 6 },
     { id: 'medium', seconds: 12, credits: 12 },
-    { id: 'full', seconds: 15, credits: 15, isFull: true },
+    { id: 'full', seconds: 18, credits: 18, isFull: true },
   ],
 
   // 积分包：一次性购买，买的积分永不过期（赠送积分可以设有效期，扣费时先扣快到期的）。价格用于展示与订单记录，实际收费以支付商后台为准。
-  // 可选 anchorPriceCents：划线原价，价格卡显示原价和“Save X%”。只能填这个套餐真实卖过的价格
+  // 可选 anchorPriceCents：划线原价，价格卡显示原价和"Save X%"。只能填这个套餐真实卖过的价格
   // （欧盟要求以降价前 30 天内的最低价为准），不能编一个从没卖过的高价；没有就不填
   packages: [
     { id: 'starter', credits: 20, priceCents: 990, currency: 'USD' },
@@ -145,7 +145,7 @@ export const site = {
   // 开关 subscriptionsEnabled：false 时不再卖新订阅（定价页、条款、退款政策和 FAQ 里的订阅内容一起隐藏，下单接口拒绝套餐），
   // 已有订阅照常续费、退款，账单页仍能取消和进门户；这时要保留 *_PRODUCTS 里套餐的商品，支付商 webhook 也别退订订阅事件。
   // 使用手册见 docs/subscriptions.md
-  subscriptionsEnabled: false as boolean,
+  subscriptionsEnabled: true as boolean,
   plans: [
     { id: 'monthly', interval: 'month', credits: 60, priceCents: 1490, currency: 'USD' },
     { id: 'yearly', interval: 'year', credits: 60, priceCents: 14900, currency: 'USD', highlight: true },
@@ -186,21 +186,21 @@ export const site = {
   // SEO 文章（指南），按展示顺序排列。slug 是根路径：/<slug> 与 /zh/<slug>；正文在 src/content/<locale>.ts 的 articles[key]。
   // 新增文章：这里加一项，各语言 content 的 articles 补同名 key（缺了 typecheck 会报错）。
   // trend、howTo 两篇被首页直接链接，不要删。related 不填时推荐其余文章里最近更新的。
-  // 日期写进 Article 的 datePublished/dateModified、页面上的“最后更新”和 sitemap lastmod，改正文时同步改 updatedAt
+  // 日期写进 Article 的 datePublished/dateModified、页面上的"最后更新"和 sitemap lastmod，改正文时同步改 updatedAt
   // cover 可选：public/ 下 1200×630 的图片路径，用在列表卡片、文章顶部、og:image 和 Article 的 image；
   // 用 scripts/article-cover.mjs 从站点自己的视频截帧生成（带标题、标签，可选多种版式）。不填时卡片没有图，og:image 用站点默认图
   articles: [
-    { key: 'trend', slug: 'tiny-desk-ai-trend', publishedAt: '2026-10-30', updatedAt: '2026-10-31' },
-    { key: 'howTo', slug: 'how-to-make-tiny-desk-ai-video', publishedAt: '2026-10-30', updatedAt: '2026-10-31' },
+    { key: 'trend', slug: 'neon-shuffle-ai-trend', publishedAt: '2026-10-20', updatedAt: '2026-10-20', cover: '/guides/neon-shuffle-ai-trend.jpg' },
+    { key: 'howTo', slug: 'how-to-make-neon-shuffle-ai-video', publishedAt: '2026-10-20', updatedAt: '2026-10-20' },
   ],
 
   seo: {
     // 长尾词：不输出 meta keywords（Google 不用），由 npm run seo:check 检查首页正文是否覆盖
-    secondaryKeywords: ['Tiny Desk AI generator', 'Tiny Desk AI video generator', 'Tiny Desk AI video from a photo', 'how to make a Tiny Desk AI video', 'AI Tiny Desk performance', 'Tiny Desk-style AI video', 'Outstanding Tiny Desk AI'],
+    secondaryKeywords: ['Neon Shuffle AI', 'Neon Shuffle video', 'Neon Shuffle trend', 'AI dance video'],
     // 首次上线日期与站点页面（首页、价格、法律页等）最近一次内容更新日期：首页视频 uploadDate、sitemap lastmod。文章用各自的日期
-    publishedAt: '2026-10-30',
-    updatedAt: '2026-10-31',
-    // Search Console / Bing Webmaster 选“HTML 标记”验证时填 content 值；用 DNS 验证则留空
+    publishedAt: '2026-10-20',
+    updatedAt: '2026-10-20',
+    // Search Console / Bing Webmaster 选"HTML 标记"验证时填 content 值；用 DNS 验证则留空
     googleVerification: '',
     bingVerification: '',
     // IndexNow key（8–128 位字母数字）：填了才会公开 /<key>.txt，配合 npm run seo:indexnow 推送
@@ -211,12 +211,12 @@ export const site = {
   },
 
   // 统计：推荐只填 cfBeaconToken（Cloudflare Web Analytics，不写 Cookie，不需要同意横幅）。
-  // 填了 ga4Id 才启用 GA4：同时出现同意横幅和页脚“Cookie 设置”，访客接受前不加载 gtag.js（Consent Mode v2 basic 模式，见 lib/consent.ts）。
+  // 填了 ga4Id 才启用 GA4：同时出现同意横幅和页脚"Cookie 设置"，访客接受前不加载 gtag.js（Consent Mode v2 basic 模式，见 lib/consent.ts）。
   // 填了 umamiWebsiteId 就在所有页面加载同域的 Umami 脚本（/s/script.js，由 Worker 代理，实例地址在 vars.UMAMI_ORIGIN，不进前端）；
   // Umami 不写 Cookie，不受同意横幅控制。
-  // 隐私政策的“Cookie 与统计”一节按这三项自动调整
+  // 隐私政策的"Cookie 与统计"一节按这三项自动调整
   analytics: {
-    ga4Id: 'G-W2Q5WH0W6Y',
+    ga4Id: '',
     cfBeaconToken: '',
     umamiWebsiteId: '',
   },
@@ -298,7 +298,7 @@ export function anchorPrice(pack: CreditPackage): { cents: number; percentOff: n
   return { cents: anchor, percentOff: Math.round((1 - pack.priceCents / anchor) * 100) }
 }
 
-// 积分包能做几条视频：列出“买得起的最长时长”和“最短时长”（相同则只列一项），没有买得起的时长时返回空数组
+// 积分包能做几条视频：列出"买得起的最长时长"和"最短时长"（相同则只列一项），没有买得起的时长时返回空数组
 export function packageMakes(credits: number): { videos: number; seconds: number }[] {
   const affordable = site.durations.filter((d) => d.credits <= credits)
   if (!affordable.length) return []

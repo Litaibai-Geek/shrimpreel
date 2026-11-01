@@ -1,8 +1,7 @@
-// The site owner replaced the previews with real AI-generated performance demos.
-// Retain the original filenames to avoid changing existing public demo media URLs.
-// These previews are separate from the R2 motion-reference input used by Kie.
+// Demo media structure for homepage previews.
+// Site owners should replace these with real AI-generated demo videos.
 export const demoMedia = {
-  band: { label: 'AI Band Performance', video: '/demo/band-session.mp4', poster: '/demo/band-session.jpg', credit: 'AI-generated demo · Tiny Desk AI' },
-  singer: { label: 'AI Vocal Performance', video: '/demo/singer-close-up.mp4', poster: '/demo/singer-close-up.jpg', credit: 'AI-generated demo · Tiny Desk AI' },
-  sax: { label: 'AI Saxophone Performance', video: '/demo/sax-solo.mp4', poster: '/demo/sax-solo.jpg', credit: 'AI-generated demo · Tiny Desk AI' },
+  demo1: { label: 'AI Demo 1', video: '/demo/ai1.mp4', poster: '/demo/ai1.jpg', credit: 'Demo clip · AI render' },
+  demo2: { label: 'AI Demo 2', video: '/demo/ai2.mp4', poster: '/demo/ai2.jpg', credit: 'Demo clip · AI render' },
+  demo3: { label: 'AI Demo 3', video: '/demo/madeWith.mp4', poster: '/demo/madeWith.jpg', credit: 'Demo clip · AI render' },
 } as const
