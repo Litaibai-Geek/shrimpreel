@@ -19,7 +19,11 @@
   },
   "email": {
     "from": null,
-    "loginEnabled": false
+    "loginEnabled": false,
+    "routing": {
+      "enabled": false,
+      "destination": ""
+    }
   },
   "secrets": {
     "file": ".dev.vars.production",

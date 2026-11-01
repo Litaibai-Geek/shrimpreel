@@ -288,9 +288,10 @@ export function main(argv = process.argv.slice(2), deps = {}) {
     if (options.mode === 'plan') {
       log('新站启动计划（没有联网或写入）：')
       planDescription(setup, parsedConfig(draft)).forEach((line) => log('  · ' + line))
-      if (setup.platforms?.cloudflare?.turnstile || setup.platforms?.cloudflare?.analytics || setup.platforms?.resend?.enabled) {
+      if (setup.platforms?.cloudflare?.turnstile || setup.platforms?.cloudflare?.analytics || setup.platforms?.resend?.enabled || setup.email?.routing?.enabled) {
         log('  · V2: Turnstile / Web Analytics / Resend 按配置创建（--apply 时）')
       }
+      if (setup.email?.routing?.enabled) log('  · 邮件转发：验证目标邮箱后配置 Cloudflare 邮件路由')
       if (original !== draft) log('  · 待更新的公开配置: ' + changedVars(original, draft).join(', '))
       return 0
     }
@@ -304,12 +305,12 @@ export function main(argv = process.argv.slice(2), deps = {}) {
       if ((setup.secrets?.sync || setup.payment?.createProducts || cloudflare.turnstile || cloudflare.analytics || resend.enabled) && !exists(secretsPath)) {
         throw new Error('Create the local runtime secrets file before initialization')
       }
-      if (cloudflare.turnstile || cloudflare.analytics || resend.enabled) {
+      if (cloudflare.turnstile || cloudflare.analytics || resend.enabled || setup.email?.routing?.enabled) {
         if (!exists('.dev.vars.platform')) throw new Error('Create .dev.vars.platform and configure platform credentials first')
         const parsed = parseDotenv(read('.dev.vars.platform'))
         if (parsed.errors.length) throw new Error('Invalid platform credentials file')
         const env = Object.fromEntries(parsed.entries)
-        if ((cloudflare.turnstile || cloudflare.analytics || (resend.enabled && resend.dns)) && !env.CLOUDFLARE_API_TOKEN) throw new Error('Missing Cloudflare platform token')
+        if ((cloudflare.turnstile || cloudflare.analytics || (resend.enabled && resend.dns) || setup.email?.routing?.enabled) && !env.CLOUDFLARE_API_TOKEN) throw new Error('Missing Cloudflare platform token')
         if (resend.enabled && !env.RESEND_ADMIN_API_KEY) throw new Error('Missing Resend administrator key')
       }
       if (setup.payment?.createProducts) {
@@ -351,7 +352,7 @@ export function main(argv = process.argv.slice(2), deps = {}) {
       // Optional V2: when the user enabled platform APIs, provision them
       // before payment and runtime secret sync, without publishing the Worker.
       const platforms = setup.platforms ?? {}
-      const enabled = Boolean(platforms.cloudflare?.turnstile || platforms.cloudflare?.analytics || platforms.resend?.enabled)
+      const enabled = Boolean(platforms.cloudflare?.turnstile || platforms.cloudflare?.analytics || platforms.resend?.enabled || setup.email?.routing?.enabled)
       if (enabled) {
         const result = runNode(['scripts/bootstrap-platforms.mjs', '--apply', '--config', options.setupFile, '--wrangler', options.wranglerFile])
         const nameservers = result.output.match(/^CLOUDFLARE_NAMESERVERS=([a-z0-9.,-]+)\s*$/im)?.[1]
@@ -368,6 +369,8 @@ export function main(argv = process.argv.slice(2), deps = {}) {
             : '请运行 npm run setup:platforms -- --verify 查看只读诊断'
           throw new Error('V2 平台配置失败：' + diagnostic)
         }
+        const routingStatus = result.output.match(/^EMAIL_ROUTING_(?:PENDING|READY)=(.+)$/m)?.[1]
+        if (routingStatus) log(routingStatus)
         updated = read(options.wranglerFile)
         log('跨平台 V2 资源已处理（未部署）')
       }

@@ -20,6 +20,8 @@ Set `GA4_MEASUREMENT_ID=G-...` in `.dev.vars.production` to enable GA4 on the ne
 
 The launch commands are `npm run setup -- --apply`, `npm run db:migrate:remote`, and `npm run deploy`, in that order. Deployment runs doctor, typecheck, unit tests and build before publishing. Back up existing production data before migrations; configure and verify external DNS, payment webhooks, reference media and email delivery separately.
 
+邮件收件转发可在 `site.setup.json` 的 `email.routing` 中启用并设置 `destination`；来源默认为 `site.adminEmail`，也可设置 `source`。目标邮箱首次验证后，重新运行 `npm run setup -- --apply` 完成转发配置。Cloudflare Token 需要邮件路由地址、规则和 Zone 设置的读写权限；已有其他服务商的 MX 或冲突规则时会停止。配置完成后需实际验证收件。
+
 Setup saves newly created Resend sending keys immediately. If an existing key cannot be recovered locally, setup creates a replacement without deleting the old key; existing Worker secrets are not overwritten.
 
 ## Built with ShrimpReel

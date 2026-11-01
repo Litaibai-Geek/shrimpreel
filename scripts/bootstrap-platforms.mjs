@@ -20,10 +20,58 @@ export function platformConfig(setup) {
   }
   const cloudflare = setup.platforms?.cloudflare ?? {}
   const resend = setup.platforms?.resend ?? {}
+  const routing = setup.email?.routing ?? {}
+  if (routing.enabled) {
+    const source = routing.source || setup.site?.adminEmail
+    const validEmail = (v) => typeof v === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+    if (!validEmail(source) || source.split('@')[1].toLowerCase() !== domain) throw new Error('邮件路由来源必须是本站域名下的邮箱')
+    if (!validEmail(routing.destination) || routing.destination.toLowerCase() === source.toLowerCase()) throw new Error('邮件路由目标邮箱无效')
+  }
   for (const key of ['accountId', 'zoneId']) {
     if (cloudflare[key] && !/^[a-f0-9]{32}$/i.test(cloudflare[key])) throw new Error('Invalid Cloudflare ' + key)
   }
   return { domain, cloudflare, resend }
+}
+
+// 目标地址必须先验证；重复执行不覆盖已有规则和第三方 MX。
+export async function provisionEmailRouting(api, accountId, zoneId, domain, source, destination, apply, log = () => {}) {
+  const addrPath = '/accounts/' + accountId + '/email/routing/addresses'
+  const rulePath = '/zones/' + zoneId + '/email/routing/rules'
+  const addresses = await cloudflarePages(api, addrPath)
+  const matches = addresses.filter((a) => a.email?.toLowerCase() === destination.toLowerCase())
+  let target = onlyOne(matches, '邮件转发目标地址')
+  if (!target) {
+    if (!apply) throw new Error('邮件转发目标地址尚未创建')
+    target = await api('POST', addrPath, { email: destination })
+  }
+  if (!target.verified) return 'pending'
+  log('邮件转发目标地址已验证')
+  const rules = await cloudflarePages(api, rulePath)
+  const hits = rules.filter((r) => r.matchers?.some((m) => m.type === 'literal' && m.field === 'to' && m.value?.toLowerCase() === source.toLowerCase()))
+  const rule = onlyOne(hits, '邮件转发规则')
+  if (rule && (!rule.enabled || rule.matchers?.length !== 1 || rule.actions?.length !== 1 || rule.actions[0].type !== 'forward' || rule.actions[0].value?.length !== 1 || rule.actions[0].value[0].toLowerCase() !== destination.toLowerCase())) {
+    throw new Error('邮件转发规则与现有规则冲突，请在 Cloudflare 核对')
+  }
+  if (!rule) {
+    if (!apply) throw new Error('邮件转发规则尚未创建')
+    await api('POST', rulePath, { name: '转发 ' + source, enabled: true,
+      matchers: [{ type: 'literal', field: 'to', value: source }],
+      actions: [{ type: 'forward', value: [destination] }] })
+  }
+  log('邮件转发规则已验证')
+  const settingsPath = '/zones/' + zoneId + '/email/routing'
+  const settings = await api('GET', settingsPath)
+  if (!settings.enabled || settings.status !== 'ready') {
+    if (!apply) throw new Error('Cloudflare 邮件路由尚未就绪')
+    const mx = await cloudflarePages(api, '/zones/' + zoneId + '/dns_records?type=MX&name=' + encodeURIComponent(domain))
+    if (mx.some((r) => !String(r.content ?? '').toLowerCase().replace(/\.$/, '').endsWith('.mx.cloudflare.net'))) {
+      throw new Error('域名已有其他邮件服务商的 MX 记录，拒绝自动更改')
+    }
+    await api('POST', settingsPath + '/dns', {})
+  }
+  const verified = await api('GET', settingsPath)
+  if (!verified.enabled || verified.status !== 'ready') throw new Error('Cloudflare 邮件路由尚未就绪，请检查 DNS')
+  return 'ready'
 }
 
 // 查找站点或父域 Zone；仅在 apply 时为确定的账号创建缺失 Zone。
@@ -69,7 +117,11 @@ export function createApiClient(base, token, fetcher = fetch) {
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       })
     } catch { throw new Error('Platform API network request failed') }
-    if (!response.ok) throw new Error('Platform API ' + method + ' failed with HTTP ' + response.status)
+    if (!response.ok) {
+      let codes = ''
+      try { codes = (await response.json()).errors?.map((error) => Number(error.code)).filter(Number.isFinite).join(',') ?? '' } catch {}
+      throw new Error('Platform API ' + method + ' failed with HTTP ' + response.status + (codes ? ' (code ' + codes + ')' : ''))
+    }
     let data
     try { data = await response.json() }
     catch { throw new Error('Platform API returned invalid JSON') }
@@ -204,6 +256,12 @@ export async function runProvisioning({ setup, current, apply, cf, resend, log, 
   const { domain, cloudflare, resend: email } = platformConfig(setup)
   let turnstile = null, analytics = null, resendData = null
   let secrets = current.secrets
+  if (setup.email?.routing?.enabled) {
+    if (!cf) throw new Error('Cloudflare administrator token required')
+    const routing = setup.email.routing
+    const state = await provisionEmailRouting(cf, cloudflare.accountId, cloudflare.zoneId, domain, routing.source || setup.site.adminEmail, routing.destination, apply, log)
+    log(state === 'pending' ? 'EMAIL_ROUTING_PENDING=请在目标邮箱验证 Cloudflare 邮件，然后重新运行 npm run setup -- --apply' : 'EMAIL_ROUTING_READY=邮件转发规则和 Cloudflare 路由已就绪')
+  }
   if (cloudflare.turnstile) {
     if (!cf) throw new Error('Cloudflare administrator token required')
     turnstile = await provisionTurnstile(cf, cloudflare.accountId, domain, apply)
@@ -274,8 +332,8 @@ export async function main(args = process.argv.slice(2), overrides = {}) {
     const vars = overrides.vars ?? loadPlatformEnv('.dev.vars.platform')
     const cf = vars.CLOUDFLARE_API_TOKEN ? createApiClient('https://api.cloudflare.com/client/v4', vars.CLOUDFLARE_API_TOKEN, overrides.fetcher) : null
     const email = vars.RESEND_ADMIN_API_KEY ? createApiClient('https://api.resend.com', vars.RESEND_ADMIN_API_KEY, overrides.fetcher) : null
-    const needsAccount = cloudflare.turnstile || cloudflare.analytics
-    const needsZone = resend.enabled && resend.dns
+    const needsAccount = cloudflare.turnstile || cloudflare.analytics || setup.email?.routing?.enabled
+    const needsZone = (resend.enabled && resend.dns) || setup.email?.routing?.enabled
     if (needsAccount || needsZone) {
       cloudflare = await discoverCloudflareIds(cf, domain, cloudflare, mode === '--apply')
       setup.platforms.cloudflare = cloudflare

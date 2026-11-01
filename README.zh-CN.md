@@ -20,6 +20,8 @@ https://github.com/user-attachments/assets/895aab94-d0c9-474e-8d90-61a6c551e536
 
 上线依次执行 `npm run setup -- --apply`、`npm run db:migrate:remote`、`npm run deploy`。部署前自动运行 doctor、类型检查、单元测试和构建。迁移现有生产数据库前应备份；外部 DNS、支付回调、参考视频和邮件投递仍需配置并验收。
 
+收件转发可在 `site.setup.json` 的 `email.routing` 设置 `enabled: true` 和 `destination`；默认将 `site.adminEmail` 转发至目标邮箱，也可用 `source` 指定本站地址。首次运行 `npm run setup -- --apply` 后，按 Cloudflare 邮件完成目标邮箱验证，再重跑相同命令创建规则并启用路由。需要 Cloudflare 邮件路由地址、规则和 Zone 设置的读写权限；若已有其他服务商的 MX 或冲突规则，脚本会停止并保留现有配置。初始化结束后仍需实际验证投递。
+
 新建的 Resend 发送密钥会立即保存到本地；远端密钥存在但本地无法恢复时，初始化会创建新密钥并保留旧密钥，已有 Worker secret 不会被自动覆盖。
 
 ## 用 ShrimpReel 做的站

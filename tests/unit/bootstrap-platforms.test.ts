@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   main, platformOptions, platformConfig, provisionTurnstile, provisionAnalytics,
-  dnsEntries, setRuntimeSecret, discoverCloudflareIds, runProvisioning,
+  dnsEntries, setRuntimeSecret, discoverCloudflareIds, runProvisioning, provisionEmailRouting,
 } from '../../scripts/bootstrap-platforms.mjs'
 
 const id = 'a'.repeat(32)
@@ -9,6 +9,45 @@ const setup = { site: { domain: 'tinydeskai.website' },
   platforms: { cloudflare: { accountId: id, turnstile: true, analytics: true } } }
 
 describe('platform bootstrap V2', () => {
+  it('邮件地址未验证时只创建目标地址，不启用 MX；验证后可重试且不会重复创建规则', async () => {
+    let target: any = null, rule: any = null, enabled = false
+    const writes: string[] = []
+    const api = async (method: string, path: string, body?: any): Promise<any> => {
+      if (method === 'GET' && path.includes('/addresses?')) return target ? [target] : []
+      if (method === 'POST' && path.endsWith('/addresses')) { writes.push('address'); target = { email: body.email, verified: null }; return target }
+      if (method === 'GET' && path.includes('/rules?')) return rule ? [rule] : []
+      if (method === 'POST' && path.endsWith('/rules')) { writes.push('rule'); rule = body; return body }
+      if (method === 'GET' && path.includes('/dns_records?')) return []
+      if (method === 'GET' && path.endsWith('/email/routing')) return { enabled, status: enabled ? 'ready' : 'unconfigured' }
+      if (method === 'POST' && path.endsWith('/email/routing/dns')) { writes.push('dns'); enabled = true; return {} }
+      throw new Error('unexpected API call')
+    }
+    const args = [api, id, id, setup.site.domain, 'support@tinydeskai.website', 'owner@example.com', true] as const
+    expect(await provisionEmailRouting(...args)).toBe('pending')
+    expect(writes).toEqual(['address'])
+    target.verified = '2026-01-01'
+    expect(await provisionEmailRouting(...args)).toBe('ready')
+    expect(await provisionEmailRouting(...args)).toBe('ready')
+    expect(writes).toEqual(['address', 'rule', 'dns'])
+  })
+
+  it('发现第三方 MX 或冲突的现有转发规则时不切换邮件服务', async () => {
+    let conflict = true
+    const writes: string[] = []
+    const api = async (method: string, path: string): Promise<any> => {
+      if (method !== 'GET') { writes.push(path); return {} }
+      if (path.includes('/addresses?')) return [{ email: 'owner@example.com', verified: 'yes' }]
+      if (path.includes('/rules?')) return [{ enabled: true, matchers: [{ type: 'literal', field: 'to', value: 'support@tinydeskai.website' }], actions: [{ type: 'forward', value: [conflict ? 'other@example.com' : 'owner@example.com'] }] }]
+      if (path.endsWith('/email/routing')) return { enabled: false, status: 'unconfigured' }
+      if (path.includes('/dns_records?')) return [{ content: 'mx.other.example' }]
+      throw new Error('unexpected API call')
+    }
+    const args = [api, id, id, setup.site.domain, 'support@tinydeskai.website', 'owner@example.com', true] as const
+    await expect(provisionEmailRouting(...args)).rejects.toThrow('冲突')
+    conflict = false
+    await expect(provisionEmailRouting(...args)).rejects.toThrow('其他邮件服务商')
+    expect(writes).toEqual([])
+  })
   it('defaults to fully offline preview', async () => {
     const called: string[] = []
     const result = await main([], { read: (name: string) => {
