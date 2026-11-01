@@ -1,5 +1,5 @@
 {
-  "name": "shrimpreel",
+  "name": "tinydeskai",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -20,12 +20,18 @@
     "cf:types": "wrangler types --strict-vars=false",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "seed:local": "node scripts/seed-local.mjs",
-    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "db:migrate:remote": "node scripts/wrangler-platform.mjs d1 migrations apply DB --remote --yes",
     "doctor": "node scripts/doctor.mjs",
-    "deploy": "npm run doctor && npm run build && wrangler deploy"
+    "deploy": "node scripts/pre-deploy.mjs && npm run doctor && npm run typecheck && npm test && npm run build && node scripts/wrangler-platform.mjs deploy",
+    "media:placeholder": "node scripts/generate-placeholder-media.mjs",
+    "media:download": "node scripts/download-demo-media.mjs",
+    "setup": "node scripts/bootstrap-site.mjs",
+    "setup:platforms": "node scripts/bootstrap-platforms.mjs",
+    "sync:wrangler": "node scripts/sync-wrangler-vars.mjs",
+    "dns:update": "node scripts/update-nameservers.mjs"
   },
   "dependencies": {
-    "@cloudflare/vite-plugin": "1.64.0",
+    "@cloudflare/vite-plugin": "1.66.0",
     "@tailwindcss/vite": "4.3.1",
     "@tanstack/react-router": "1.170.45",
     "@tanstack/react-start": "1.169.3",
@@ -55,8 +61,7 @@
     }
   },
   "allowScripts": {
-    "workerd@1.20261012.1": true,
-    "workerd@1.20261019.1": true,
-    "esbuild@0.28.2": true
+    "esbuild@0.28.2": true,
+    "workerd@1.20261023.1": true
   }
 }

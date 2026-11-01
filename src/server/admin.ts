@@ -450,7 +450,8 @@ adminRoutes.get('/takedowns', async (c) => {
   const status = c.req.query('status') ?? 'open'
   const rows = await c.env.DB.prepare(
     `SELECT t.*, g.status AS generation_status, g.removed_at AS generation_removed_at,
-     g.output_r2_key IS NOT NULL AS has_output, u.email AS owner_email
+     g.output_r2_key IS NOT NULL AS has_output, u.email AS owner_email,
+     CASE WHEN json_valid(g.provider_meta) THEN json_extract(g.provider_meta, '$.band.uploadIds') ELSE NULL END AS band_upload_ids
      FROM takedown_requests t LEFT JOIN generations g ON g.id = t.generation_id LEFT JOIN users u ON u.id = g.user_id
      WHERE t.status = ? ORDER BY ${status === 'open' ? 't.due_at ASC' : 't.created_at DESC'} LIMIT ? OFFSET ?`,
   )
@@ -466,7 +467,7 @@ adminRoutes.post('/takedowns/:id/resolve', async (c) => {
   const report = await db.prepare('SELECT * FROM takedown_requests WHERE id = ?').bind(c.req.param('id')).first<TakedownRow>()
   if (!report) throw new ApiError(404, 'not_found')
   if (report.status !== 'open') throw new ApiError(409, 'already_resolved')
-  const body = await readJson<{ action: 'remove' | 'reject'; generationId?: string; note?: string }>(c)
+  const body = await readJson<{ action: 'remove' | 'reject'; generationId?: string; memberUploadId?: string; note?: string }>(c)
   const note = body.note?.trim().slice(0, 1000) ?? ''
   let result: Omit<Awaited<ReturnType<typeof removeReportedContent>>, 'owners'> | null = null
   let owners: Array<{ userId: string; videos: number }> = []
@@ -477,7 +478,7 @@ adminRoutes.post('/takedowns/:id/resolve', async (c) => {
       ? await db.prepare('SELECT * FROM generations WHERE id = ?').bind(generationId).first<GenerationRow>()
       : null
     if (!generation) throw new ApiError(404, 'generation_not_found')
-    const { owners: removedOwners, ...removal } = await removeReportedContent(c.env, generation, report.id)
+    const { owners: removedOwners, ...removal } = await removeReportedContent(c.env, generation, report.id, body.memberUploadId?.trim() || undefined)
     owners = removedOwners
     result = removal
   } else if (body.action === 'reject') {
@@ -494,7 +495,7 @@ adminRoutes.post('/takedowns/:id/resolve', async (c) => {
     .bind(status, generationId, nowIso(), admin.id, note || null, report.id)
     .run()
   if (!updated.meta.changes) throw new ApiError(409, 'already_resolved')
-  await audit(c.env, admin, `takedown.${status}`, 'takedown', report.id, { generationId, note, ...result })
+  await audit(c.env, admin, `takedown.${status}`, 'takedown', report.id, { generationId, memberUploadId: body.memberUploadId ?? null, note, ...result })
   await notifyTakedownResolved(c.env, report, status, owners)
   return c.json({ ok: true, status, ...result })
 })

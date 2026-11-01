@@ -14,6 +14,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import ts from 'typescript'
 import { sellingPlans, site } from '../src/config/site.ts'
 import { checkConfig } from '../src/server/config-health.ts'
+import { cloudflareEnv } from './cloudflare-env.mjs'
 
 export function readWranglerConfig(file) {
   const { config, error } = ts.parseConfigFileTextToJson(file, readFileSync(file, 'utf8'))
@@ -47,15 +48,16 @@ export function parsePendingMigrations(output) {
 
 // `wrangler secret list --format json`：[{ "name": "...", "type": "secret_text" }]，前后可能夹着 wrangler 的提示行
 export function parseSecretNames(output) {
-  const start = output.indexOf('[')
-  const end = output.lastIndexOf(']')
-  if (start < 0 || end < start) return null
-  try {
-    const list = JSON.parse(output.slice(start, end + 1))
-    return Array.isArray(list) ? list.map((s) => s.name).filter((n) => typeof n === 'string') : null
-  } catch {
-    return null
+  // 提示、ANSI 颜色和日志路径也可能包含方括号；只接受实际的 secret 数组。
+  for (let start = output.indexOf('['); start >= 0; start = output.indexOf('[', start + 1)) {
+    for (let end = output.indexOf(']', start + 1); end >= 0; end = output.indexOf(']', end + 1)) {
+      try {
+        const list = JSON.parse(output.slice(start, end + 1))
+        if (Array.isArray(list) && list.every((item) => item && typeof item.name === 'string')) return list.map((item) => item.name)
+      } catch { /* 继续查找 JSON 数组 */ }
+    }
   }
+  return null
 }
 
 // 派生新站时没拿到的信息写成 `TODO(site): …`（见 .claude/skills/new-hot-site），上线前必须全部填完
@@ -142,7 +144,7 @@ export function runDoctor(
 const WRANGLER_BIN = fileURLToPath(new URL('../node_modules/wrangler/bin/wrangler.js', import.meta.url))
 
 function wrangler(args) {
-  const result = spawnSync(process.execPath, [WRANGLER_BIN, ...args], { encoding: 'utf8' })
+  const result = spawnSync(process.execPath, [WRANGLER_BIN, ...args], { encoding: 'utf8', env: cloudflareEnv() })
   return { ok: result.status === 0, output: `${result.stdout ?? ''}\n${result.stderr ?? ''}` }
 }
 

@@ -160,6 +160,8 @@ describe('doctor', () => {
       'SESSION_SECRET',
     ])
     expect(parseSecretNames('✘ [ERROR] Worker not found [code: 10007]')).toBeNull()
+    expect(parseSecretNames('\u001b[33m[WARNING]\u001b[0m\n[{"name":"SESSION_SECRET"}]\n[notice]')).toEqual(['SESSION_SECRET'])
+    expect(parseSecretNames('[WARNING]\n[]\n[notice]')).toEqual([])
   })
 
   // 把模板配置改成一份可上线的配置，再逐项破坏

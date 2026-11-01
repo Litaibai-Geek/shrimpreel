@@ -3,6 +3,7 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { defaultStyle, findDuration, findPackage, findPlan, findStyle, isLocale, localePath, sellingPlans, site } from '#/config/site'
 import { safeRedirectPath } from '#/lib/redirect'
+import { isBandUploadIds } from '#/lib/band'
 import { exportFileName, exportUserData } from './account-export'
 import { adminRoutes } from './admin'
 import { runHealthCheck } from './alerts'
@@ -13,6 +14,8 @@ import { CLIENT_ERROR_PATH, summarizeClientError } from './client-error'
 import { clawbackStatements, expireStatements, ledgerStatements } from './credits'
 import { CSP_REPORT_PATH, summarizeCspReports } from './csp'
 import { exchangeGoogleCode, googleAuthRedirect, googleClientId, googleOAuthConfig, verifyGoogleIdToken } from './google'
+import { consumeEmailCode, emailLoginAvailable, normalizedLoginEmail, requestEmailCode } from './email-auth'
+import { registerWithPassword, signInWithPassword } from './password-auth'
 import { publicGeneration, publicOrder, rateLimit, readJson, requireUser, pageParams } from './http'
 import { enqueueJob, failGeneration, handleDeadLetter, handleVideoJob } from './jobs'
 import { jobToken, serveR2Object, sniffImageType, verifyUploadSignature } from './media'
@@ -42,6 +45,7 @@ import {
   subscriptionRef,
 } from './subscriptions'
 import { createTakedown, isBlockedMedia, parseTakedown, type TakedownInput } from './takedown'
+import { testPaymentPackage } from './test-payment'
 import { turnstileSiteKey, verifyTurnstile } from './turnstile'
 import type { AppContext, GenerationRow, OrderRow, UploadRow, UserRow } from './types'
 import { ApiError, constantTimeEqual, createId, isCheckConstraintError, isProduction, nowIso, randomToken, sha256Hex } from './util'
@@ -50,6 +54,18 @@ import { activeVideoProviderId } from './video'
 const MAX_ACTIVE_JOBS_PER_USER = 3
 
 export const app = new Hono<AppContext>()
+
+// www 跳转中间件：将 www 子域名 301 跳转到裸域
+app.use('*', async (c, next) => {
+  const host = c.req.header('host')
+  if (host?.startsWith('www.')) {
+    const bareHost = host.substring(4) // 移除 'www.'
+    const url = new URL(c.req.url)
+    url.host = bareHost
+    return c.redirect(url.toString(), 301)
+  }
+  return next()
+})
 
 app.onError((error, c) => {
   if (error instanceof ApiError) {
@@ -115,6 +131,7 @@ app.get('/api/me', async (c) => {
     user: user ? publicUser(user) : null,
     config: {
       googleClientId: googleClientId(c.env) ?? null,
+      emailLogin: emailLoginAvailable(c.env),
       devLogin: !isProduction(c.env),
       paymentProvider: settings.paymentProvider || c.env.PAYMENT_PROVIDER,
       turnstileSiteKey: turnstileSiteKey(c.env),
@@ -213,6 +230,40 @@ app.post('/api/auth/google/one-tap', async (c) => {
   return c.json({ user: publicUser(user) })
 })
 
+// Email verification is separate from Google auth; existing Google accounts
+// must explicitly opt in while signed in. Neither endpoint logs OTP codes.
+app.post('/api/auth/email/request', async (c) => {
+  const { email, purpose, locale, turnstileToken } = await readJson<{
+    email: string; purpose: 'login' | 'enable'; locale: string; turnstileToken: string
+  }>(c)
+  await rateLimit(c.env.AUTH_LIMITER, 'email-ip:' + (c.req.header('cf-connecting-ip') ?? 'local'))
+  const cleaned = normalizedLoginEmail(email)
+  if (!cleaned) throw new ApiError(400, 'invalid_email')
+  await rateLimit(c.env.AUTH_LIMITER, 'email-address:' + await sha256Hex(cleaned))
+  await verifyTurnstile(c.env, turnstileToken, c.req.header('cf-connecting-ip'))
+  const result = await requestEmailCode(c.env, {
+    email: cleaned, purpose: purpose ?? 'login', user: c.get('user'), locale,
+  })
+  c.header('Cache-Control', 'no-store')
+  return c.json(result)
+})
+
+app.post('/api/auth/email/verify', async (c) => {
+  await rateLimit(c.env.AUTH_LIMITER, 'email-verify:' + (c.req.header('cf-connecting-ip') ?? 'local'))
+  const { challengeId, code, locale } = await readJson<{
+    challengeId: string; code: string; locale: string
+  }>(c)
+  const result = await consumeEmailCode(c.env, {
+    challengeId, code, user: c.get('user'), locale,
+    country: c.req.header('cf-ipcountry') ?? null,
+    attribution: requestAttribution(c, 'first'),
+    referral: await requestReferral(c),
+  })
+  if (!result.linked) await startSession(c, result.user.id)
+  c.header('Cache-Control', 'no-store')
+  return c.json({ user: publicUser(result.user), linked: result.linked })
+})
+
 // 本地快捷登录（e2e 依赖它）；生产环境或经隧道/公网访问时 404
 app.post('/api/auth/dev-login', async (c) => {
   if (!isLocalDevRequest(c)) throw new ApiError(404, 'not_found')
@@ -237,6 +288,53 @@ app.post('/api/auth/logout', async (c) => {
   return c.json({ ok: true })
 })
 
+// 密码注册（当 EMAIL_LOGIN_ENABLED=false 时使用）
+app.post('/api/auth/password/register', async (c) => {
+  await rateLimit(c.env.AUTH_LIMITER, 'register-ip:' + (c.req.header('cf-connecting-ip') ?? 'local'))
+
+  const { name, email, password, locale, turnstileToken } = await readJson<{
+    name?: string
+    email: string
+    password: string
+    locale: string
+    turnstileToken: string
+  }>(c)
+
+  // Turnstile 验证（必需）
+  await verifyTurnstile(c.env, turnstileToken, c.req.header('cf-connecting-ip'))
+
+  const user = await registerWithPassword(c.env, {
+    name,
+    email,
+    password,
+    ip: c.req.header('cf-connecting-ip') ?? 'local',
+    locale,
+    country: c.req.header('cf-ipcountry') ?? null,
+    attribution: requestAttribution(c, 'first'),
+    referral: await requestReferral(c),
+  })
+
+  await startSession(c, user.id)
+  c.header('Cache-Control', 'no-store')
+  return c.json({ user: publicUser(user) })
+})
+
+// 密码登录
+app.post('/api/auth/password/signin', async (c) => {
+  await rateLimit(c.env.AUTH_LIMITER, 'signin-ip:' + (c.req.header('cf-connecting-ip') ?? 'local'))
+
+  const { email, password } = await readJson<{
+    email: string
+    password: string
+    locale?: string
+  }>(c)
+
+  const user = await signInWithPassword(c.env, { email, password })
+  await startSession(c, user.id)
+  c.header('Cache-Control', 'no-store')
+  return c.json({ user: publicUser(user) })
+})
+
 // ---------- Uploads ----------
 
 app.post('/api/uploads', async (c) => {
@@ -245,19 +343,26 @@ app.post('/api/uploads', async (c) => {
   // 没有 Content-Length（分块上传）时 formData() 会把整个请求体读进内存，直接拒绝；浏览器上传表单总会带长度
   const header = c.req.header('content-length')
   if (!header || !/^\d+$/.test(header)) throw new ApiError(411, 'length_required')
-  if (Number(header) > site.upload.maxBytes + 64 * 1024) throw new ApiError(413, 'file_too_large')
+  if (Number(header) > site.upload.maxBytes * 2 + 64 * 1024) throw new ApiError(413, 'file_too_large')
   const form = await c.req.raw.formData().catch(() => null)
   const file = form?.get('file')
   if (!file || typeof file === 'string') throw new ApiError(400, 'missing_file')
   if (file.size > site.upload.maxBytes) throw new ApiError(413, 'file_too_large')
-  const bytes = new Uint8Array(await file.arrayBuffer())
-  const contentType = sniffImageType(bytes)
-  if (!contentType || !(site.upload.contentTypes as readonly string[]).includes(contentType)) {
+  const original = new Uint8Array(await file.arrayBuffer())
+  const originalType = sniffImageType(original)
+  if (!originalType || !(site.upload.contentTypes as readonly string[]).includes(originalType)) {
     throw new ApiError(415, 'unsupported_file_type')
   }
+  const prepared = form?.get('prepared')
+  if (typeof prepared === 'string') throw new ApiError(400, 'invalid_upload')
+  if (prepared && prepared.size > site.upload.maxBytes) throw new ApiError(413, 'file_too_large')
+  const bytes = prepared ? new Uint8Array(await prepared.arrayBuffer()) : original
+  const contentType = sniffImageType(bytes)
+  if (!contentType || !(site.upload.contentTypes as readonly string[]).includes(contentType)) throw new ApiError(415, 'unsupported_file_type')
   // 已下架内容的原图不允许再次上传；审核不通过的不落盘、不扣积分
-  const hash = await sha256Hex(bytes)
+  const hash = await sha256Hex(original)
   if (await isBlockedMedia(c.env, hash)) throw new ApiError(422, 'content_rejected')
+  if (prepared && await isBlockedMedia(c.env, await sha256Hex(bytes))) throw new ApiError(422, 'content_rejected')
   const mockOutcome = form?.get('mockOutcome')
   const verdict = await getModerationProvider(c.env).checkImage({
     bytes,
@@ -286,17 +391,35 @@ app.post('/api/generations', async (c) => {
   const settings = await getSettings(c.env)
   assertOpen(settings, user)
   await rateLimit(c.env.GENERATE_LIMITER, user.id)
-  const body = await readJson<{ uploadId: string; durationId: string; styleId?: string; mockOutcome: string; locale: string }>(c)
+  const body = await readJson<{ uploadId: string; uploadIds: unknown; mode: 'solo' | 'band'; durationId: string; styleId?: string; mockOutcome: string; locale: string }>(c)
+  const mode = body.mode ?? 'solo'
+  if (mode !== 'solo' && mode !== 'band') throw new ApiError(400, 'band_invalid')
+  let bandIds: string[] = []
+  if (mode === 'band') {
+    if (!isBandUploadIds(body.uploadIds)) throw new ApiError(400, 'band_invalid')
+    bandIds = body.uploadIds
+  }
   const duration = findDuration(body.durationId ?? '')
   if (!duration) throw new ApiError(400, 'invalid_duration')
   // 不带 styleId 用默认风格；带了但不存在报错，不悄悄换风格
   const style = body.styleId === undefined || body.styleId === null ? defaultStyle : findStyle(String(body.styleId))
   if (!style) throw new ApiError(400, 'invalid_style')
   const db = c.env.DB
-  const upload = await db
-    .prepare('SELECT * FROM uploads WHERE id = ? AND user_id = ? AND expired_at IS NULL')
-    .bind(body.uploadId ?? '', user.id)
-    .first<UploadRow>()
+  let upload: UploadRow | null
+  if (mode === 'band') {
+    const found = await db
+      .prepare(`SELECT * FROM uploads WHERE id IN (${bandIds.map(() => '?').join(',')}) AND user_id = ? AND expired_at IS NULL`)
+      .bind(...bandIds, user.id)
+      .all<UploadRow>()
+    const ordered = bandIds.map((id) => found.results.find((item) => item.id === id))
+    if (ordered.some((item) => !item)) throw new ApiError(400, 'invalid_upload')
+    const hashes = ordered.map((item) => item!.sha256).filter((hash): hash is string => !!hash)
+    if (new Set(hashes).size !== hashes.length) throw new ApiError(400, 'band_duplicate')
+    upload = ordered[0]!
+  } else {
+    upload = await db.prepare('SELECT * FROM uploads WHERE id = ? AND user_id = ? AND expired_at IS NULL')
+      .bind(body.uploadId ?? '', user.id).first<UploadRow>()
+  }
   if (!upload) throw new ApiError(400, 'invalid_upload')
   const active = await db
     .prepare(`SELECT COUNT(*) AS n FROM generations WHERE user_id = ? AND status IN ('queued', 'processing')`)
@@ -308,8 +431,11 @@ app.post('/api/generations', async (c) => {
   await rememberLocale(c.env, user, body.locale)
 
   const providerId = activeVideoProviderId(c.env)
+  if (mode === 'band' && providerId !== 'kie' && providerId !== 'mock') throw new ApiError(503, 'band_provider_unavailable')
   const mockOutcome = providerId === 'mock' && (body.mockOutcome === 'fail' || body.mockOutcome === 'hang') ? body.mockOutcome : null
-  const meta = mockOutcome ? JSON.stringify({ mockOutcome }) : null
+  const meta = mode === 'band'
+    ? JSON.stringify({ mode: 'band', band: { uploadIds: bandIds }, ...(mockOutcome ? { mockOutcome } : {}) })
+    : mockOutcome ? JSON.stringify({ mockOutcome }) : null
   const id = createId('gen')
   const now = nowIso()
   try {
@@ -487,13 +613,16 @@ app.post('/api/checkout', async (c) => {
   await rateLimit(c.env.AUTH_LIMITER, `checkout:${user.id}`)
   const body = await readJson<{ packageId: string; locale: string }>(c)
   // packageId 可以是积分包或在售的订阅套餐（订阅开关关掉时套餐不能再下单）
-  const pack = findPackage(body.packageId ?? '') ?? sellingPlans.find((p) => p.id === body.packageId)
+  const testPack = testPaymentPackage(body.packageId ?? '', site.testPaymentEnabled, user.role)
+  if (body.packageId === 'admin_payment_test' && !testPack) throw new ApiError(400, 'invalid_package')
+  const pack = testPack ?? findPackage(body.packageId ?? '') ?? sellingPlans.find((p) => p.id === body.packageId)
   if (!pack) throw new ApiError(400, 'invalid_package')
   // 同一时间只允许一个订阅；已到期取消且当期结束的不算（见 LIVE_SUBSCRIPTION_SQL）
   if (findPlan(pack.id) && (await liveSubscription(c.env.DB, user.id))) throw new ApiError(409, 'subscription_exists')
   const locale = isLocale(body.locale) ? body.locale : 'en'
   await rememberLocale(c.env, user, body.locale)
   const provider = getPaymentProvider(c.env, settings.paymentProvider)
+  if (testPack && provider.id !== 'waffo') throw new ApiError(503, 'payment_not_configured')
   const id = createId('ord')
   const now = nowIso()
   const attr = requestAttribution(c, 'last')
@@ -796,14 +925,28 @@ app.post('/api/webhooks/stripe', async (c) => {
   return c.json({ received: true, ...result })
 })
 
-// 视频服务商完成回调（fal、yir、nanoapi）：只当作“立即轮询”的信号，真实结果由 jobs.ts 用 API key 拉取，
-// 所以只校验地址里的任务 token，不验 yir 的签名头；nanoapi 的回调不带签名，同样只靠地址里的 token
-for (const provider of ['fal', 'yir', 'nanoapi']) {
+// 视频服务商完成回调（fal、yir、nanoapi、kie）：只当作“立即轮询”的信号，真实结果由 jobs.ts 用 API key 拉取，
+// 所以只校验地址里的任务 token，不验 yir 的签名头；nanoapi 和 Kie 的回调也只靠地址里的 token
+for (const provider of ['fal', 'yir', 'nanoapi', 'kie']) {
   app.post(`/api/webhooks/${provider}`, async (c) => {
     const generationId = c.req.query('gen') ?? ''
     const token = c.req.query('token') ?? ''
     if (!generationId || !constantTimeEqual(token, await jobToken(c.env, generationId))) {
       throw new WebhookVerificationError(`invalid ${provider} job token`)
+    }
+    if (provider === 'kie') {
+      // Kie callback includes data.taskId. Persist it if createTask succeeded upstream but the Worker
+      // lost the create response before saving provider_request_id; this avoids blindly resubmitting.
+      const payload = (await c.req.json().catch(() => null)) as { data?: { taskId?: unknown } } | null
+      const taskId = typeof payload?.data?.taskId === 'string' ? payload.data.taskId : ''
+      if (taskId) {
+        await c.env.DB.prepare(
+          `UPDATE generations SET status = 'processing', provider_request_id = ?, updated_at = ?
+           WHERE id = ? AND provider = 'kie' AND status IN ('queued', 'processing') AND provider_request_id IS NULL`,
+        )
+          .bind(taskId, nowIso(), generationId)
+          .run()
+      }
     }
     await enqueueJob(c.env, { kind: 'poll', generationId })
     return c.json({ received: true })
@@ -874,6 +1017,7 @@ app.delete('/api/account', async (c) => {
     db.prepare('DELETE FROM generations WHERE user_id = ?').bind(user.id),
     db.prepare('DELETE FROM uploads WHERE user_id = ?').bind(user.id),
     db.prepare('DELETE FROM email_outbox WHERE user_id = ?').bind(user.id),
+    db.prepare('DELETE FROM email_login_challenges WHERE email = ? OR user_id = ?').bind(user.email, user.id),
     ...clawbackStatements(db, {
       userId: user.id,
       maxAmount: 1_000_000_000, // 全部剩余积分
@@ -882,7 +1026,7 @@ app.delete('/api/account', async (c) => {
     }),
     db
       .prepare(
-        `UPDATE users SET email = ?, name = NULL, avatar_url = NULL, google_sub = NULL, status = 'deleted' WHERE id = ?`,
+        `UPDATE users SET email = ?, name = NULL, avatar_url = NULL, google_sub = NULL, email_login_enabled = 0, status = 'deleted' WHERE id = ?`,
       )
       .bind(`deleted+${user.id}@deleted.invalid`, user.id),
     db

@@ -91,6 +91,14 @@ function ArticlePage() {
           </section>
         ))}
       </div>
+      {article.key === 'trend' ? (
+        <aside className="mt-9 border-t border-line pt-5 text-sm text-muted">
+          <p className="font-semibold text-fg">{locale === 'zh' ? '原始演出的官方来源' : 'Official source for the original performance'}</p>
+          <a href="https://www.youtube.com/watch?v=J3jUEB7qmt8" target="_blank" rel="noopener noreferrer" className="mt-2 inline-block underline underline-offset-2">
+            NPR Music · Charlie Wilson: Tiny Desk Concert (June 5, 2023)
+          </a>
+        </aside>
+      ) : null}
       <div className="card mt-12 flex flex-col items-start gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
         <p className="font-display text-2xl">{c.finalCta.title}</p>
         <a href={`${lp('/')}#create`} className="btn-primary shrink-0">

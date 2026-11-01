@@ -2,6 +2,7 @@ import { createFileRoute, useHydrated } from '@tanstack/react-router'
 import { CircleCheck, Copy } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Turnstile } from '#/components/Turnstile'
+import { EmailCodeForm } from '#/components/EmailCodeForm'
 import { ErrorText, Spinner, formatDate } from '#/components/ui'
 import { api, errorCode } from '#/lib/api'
 import { useContent, useLocale, useLocalePath } from '#/lib/i18n'
@@ -16,7 +17,7 @@ function SettingsPage() {
   const s = c.settings
   const locale = useLocale()
   const lp = useLocalePath()
-  const { user, signOut } = useSession()
+  const { user, config, signOut, refresh } = useSession()
   const [confirmText, setConfirmText] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -55,6 +56,14 @@ function SettingsPage() {
           {s.signOut}
         </button>
       </section>
+      {config?.emailLogin && !user.emailLoginEnabled && user.role !== 'admin' ? (
+        <section className="card p-6">
+          <EmailCodeForm purpose="enable" email={user.email} onSuccess={refresh} />
+        </section>
+      ) : null}
+      {config?.emailLogin && user.emailLoginEnabled ? (
+        <p className="text-sm text-muted" role="status">{c.signIn.emailLinked}</p>
+      ) : null}
       <ReferralCard />
       <RedeemCard />
       <section className="card space-y-4 p-6">

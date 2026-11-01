@@ -1,5 +1,5 @@
 import type { Hono } from 'hono'
-import { sellingPlans, site } from '#/config/site'
+import { site } from '#/config/site'
 import { ALERT_RULES } from './alerts'
 import { emailConfig } from './email'
 import { audit, requireAdmin } from './http'
@@ -72,8 +72,13 @@ async function probePayment(env: Env, override: string): Promise<Outcome> {
   const id = activePaymentProviderId(env, override)
   if (id === 'mock') return ok('mock 支付，不调用外部接口')
   const products = parseJsonRecord(id === 'dodo' ? env.DODO_PRODUCTS : id === 'stripe' ? env.STRIPE_PRODUCTS : env.WAFFO_PRODUCTS)
-  // 积分包和订阅套餐都要有商品
-  const items = [...site.packages, ...sellingPlans]
+  // 订阅停止销售后，仍须检查已有订阅和尚未完成的历史订单；从未卖过的套餐不应报缺失。
+  const historical = await env.DB.prepare(
+    'SELECT DISTINCT plan_id FROM subscriptions WHERE provider = ? UNION SELECT DISTINCT package_id AS plan_id FROM orders WHERE provider = ?',
+  ).bind(id, id).all<{ plan_id: string }>()
+  const knownPlans = new Set(site.plans.map((plan) => plan.id))
+  const historicalIds = new Set((historical.results ?? []).map((row) => row.plan_id).filter((planId) => knownPlans.has(planId)))
+  const items = [...site.packages, ...site.plans.filter((plan) => site.subscriptionsEnabled || historicalIds.has(plan.id))]
   const missing = items.filter((pack) => !products[pack.id]).map((pack) => pack.id)
   if (id === 'waffo') {
     // 用不存在的订单号查一次付款：能返回空列表说明商户号、私钥和签名都正确
@@ -124,7 +129,8 @@ async function probeStripePrices(
 ): Promise<Outcome> {
   const apiKey = cleanSecret(env.STRIPE_SECRET_KEY)
   if (!apiKey) return fail('STRIPE_SECRET_KEY 未配置')
-  const planIntervals = new Map(sellingPlans.map((plan) => [plan.id, plan.interval]))
+  // 即使 subscriptionsEnabled=false，已有订阅仍会续费，Price 仍须保持 recurring 周期正确。
+  const planIntervals = new Map(site.plans.map((plan) => [plan.id, plan.interval]))
   const problems = missing.map((packId) => `${packId}：STRIPE_PRODUCTS 里没有 Price ID`)
   const warnings: string[] = []
   for (const pack of items) {
@@ -169,9 +175,12 @@ async function probeStripePrices(
   return ok(`鉴权正常，${items.length} 个套餐的 Price 和价格与 site.ts 一致`)
 }
 
-function balanceOutcome(amount: number, currency: string, provider: string) {
-  const text = `${amount.toFixed(2)} ${currency}`
-  return amount < ALERT_RULES.provider_balance.lowUsd ? warn(`鉴权正常，但 ${provider} 余额只剩 ${text}，请尽快充值`) : ok(`鉴权正常，余额 ${text}`)
+function balanceOutcome(amount: number, currency: string, provider: string, amountUsd?: number) {
+  const text = currency === 'credits' && amountUsd !== undefined
+    ? `${amount.toFixed(2)} credits (~$${amountUsd.toFixed(2)})`
+    : `${amount.toFixed(2)} ${currency}`
+  const usd = amountUsd ?? amount
+  return usd < ALERT_RULES.provider_balance.lowUsd ? warn(`鉴权正常，但 ${provider} 余额只剩 ${text}，请尽快充值`) : ok(`鉴权正常，余额 ${text}`)
 }
 
 async function probeVideo(env: Env): Promise<Outcome> {
@@ -183,7 +192,7 @@ async function probeVideo(env: Env): Promise<Outcome> {
   if (result.status === 'forbidden') return warn(`${result.keyName} 有效，但没有 billing:usage:read 权限，查不到余额（不影响生成）`)
   if (result.status === 'http') return fail(`查询余额返回 HTTP ${result.code}`)
   if (result.status === 'unreadable') return warn('鉴权正常，但读不到余额')
-  return balanceOutcome(result.amount, result.currency, result.provider)
+  return balanceOutcome(result.amount, result.currency, result.provider, result.amountUsd)
 }
 
 async function probeModeration(env: Env): Promise<Outcome> {

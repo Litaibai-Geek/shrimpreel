@@ -32,7 +32,7 @@ function priceOf(cents: number) {
 // 首页：组织 + 网站 + 应用（全部积分包汇总成 AggregateOffer）+ 示例视频
 export function homeJsonLd(locale: Locale, description: string, video: { name: string; description: string }) {
   const prices = site.packages.map((p) => p.priceCents)
-  const sample = defaultStyle.examples.aiVersions[0]
+  const sample = defaultStyle.examples.madeWith
   return {
     '@context': 'https://schema.org',
     '@graph': [
@@ -55,7 +55,7 @@ export function homeJsonLd(locale: Locale, description: string, video: { name: s
           offerCount: site.packages.length,
         },
       },
-      ...(sample
+      ...(sample.photo && sample.video && sample.poster
         ? [
             {
               '@type': 'VideoObject',

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { summarizeCspReports } from '#/server/csp'
+import { contentSecurityPolicy, summarizeCspReports } from '#/server/csp'
+
+describe('contentSecurityPolicy', () => {
+  it('allows licensed Pexels preview posters and videos', () => {
+    const policy = contentSecurityPolicy('test-nonce')
+    expect(policy).toContain('https://images.pexels.com')
+    expect(policy).toContain("media-src 'self' https://videos.pexels.com")
+  })
+})
 
 describe('summarizeCspReports', () => {
   it('report-uri 格式：URL 去掉 query 和 hash（不把买家邮箱写进日志），inline 等关键字原样保留', () => {

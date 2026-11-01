@@ -12,6 +12,7 @@
     "types": ["vite/client", "./worker-configuration.d.ts"],
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
+    "allowJs": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,
     "skipLibCheck": true,

@@ -1,11 +1,15 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   // 新站点：改 name、routes、database_name/id、bucket_name、queue 名称，再改 src/config/site.ts
-  "name": "video-template",
+  "name": "tinydeskai-website",
   "main": "src/server.ts",
   "compatibility_date": "2026-06-19",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
+  "routes": [
+    { "pattern": "tinydeskai.website/*", "zone_name": "tinydeskai.website" },
+    { "pattern": "www.tinydeskai.website/*", "zone_name": "tinydeskai.website" }
+  ],
   "observability": { "enabled": true },
   "assets": {
     "directory": "./dist/client",
@@ -13,62 +17,65 @@
     "run_worker_first": ["/api/*"]
   },
   "vars": {
-    "APP_ENV": "development",
-    "SITE_URL": "http://localhost:3000",
+    "APP_ENV": "production",
+    "SITE_URL": "https://tinydeskai.website",
     // waffo | dodo | stripe | mock（mock 只允许非 production）
-    "PAYMENT_PROVIDER": "mock",
-    // fal | yir | nanoapi | mock（mock 只允许非 production）
-    "VIDEO_PROVIDER": "mock",
+    "PAYMENT_PROVIDER": "waffo",
+    // fal | yir | nanoapi | kie | mock（mock 只允许非 production）
+    "VIDEO_PROVIDER": "kie",
     // 管理员邮箱（逗号分隔）：登录即为管理员，同时接收举报、留言提醒和系统告警
-    "ADMIN_EMAILS": "admin@example.com",
+    "ADMIN_EMAILS": "luochengbin0920@gmail.com",
     // 交易邮件发件地址，域名须在 Cloudflare Email Service 完成 Onboard；留空 = 不发信（后台“邮件”页记为 skipped）
-    "EMAIL_FROM": "noreply@example.com",
-    "WAFFO_ENVIRONMENT": "test",
-    // Waffo 店铺 ID（STO_xxx，公开）：订阅的客户门户要用；只卖积分包可以留空
-    "WAFFO_STORE_ID": "",
+    "EMAIL_FROM": "noreply@tinydeskai.website",
+    "WAFFO_ENVIRONMENT": "prod",
+    // Waffo 店铺 ID（STO_xxx，公开）：由站点初始化从 site.setup.json 同步
+    "WAFFO_STORE_ID": "STO_6D4bDDFAtedVjWKXT9N6G8",
+    "WAFFO_PRODUCTS": "{\"starter\":\"PROD_3FRj2nVu7H15wfbuObBPk7\",\"party\":\"PROD_6gzuUs1tVMK6Us4Fe8jS7J\",\"squad\":\"PROD_3e8emyTLtxYCvQMA5uBwVE\",\"admin_payment_test\":\"PROD_20E6w6Q5ihPJ4bFB81DOL4\"}",
     "DODO_ENVIRONMENT": "test",
     // 每个积分包、订阅套餐对应支付商的 product id（JSON：{"starter":"PROD_xxx","monthly":"PROD_yyy",...}）
-    "WAFFO_PRODUCTS": "{}",
+    // WAFFO_PRODUCTS 可由站点初始化创建商品后写入
     "DODO_PRODUCTS": "{}",
     // Stripe：test | live，要和 STRIPE_SECRET_KEY 的模式一致；STRIPE_PRODUCTS 存 Price ID（price_...），scripts/stripe-setup.mjs 可以生成
     "STRIPE_ENVIRONMENT": "test",
     "STRIPE_PRODUCTS": "{}",
-    "GOOGLE_CLIENT_ID": "",
+    "GOOGLE_CLIENT_ID": "662283162475-aou10e333157eaghu1s652nim2pcsh66.apps.googleusercontent.com",
+    // Opt-in only after 0016 migration, a verified sender and Turnstile.
+    "EMAIL_LOGIN_ENABLED": "false",
     // Cloudflare Turnstile 站点密钥（公开）；留空 = 不启用。启用时必须同时 `wrangler secret put TURNSTILE_SECRET_KEY`
-    "TURNSTILE_SITE_KEY": "",
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAFu1mZ1cXC8Ya2Bq",  // 👈 从 Cloudflare Dashboard 复制站点密钥
     // Umami 实例地址（不带路径的 https origin，如 https://umami.example.com）；留空 = 不代理。只在 Worker 端使用，不进前端
     "UMAMI_ORIGIN": "",
     // 上传图片审核：openai（需 OPENAI_API_KEY）| none | mock（mock 只允许非 production）
-    "MODERATION_PROVIDER": "mock"
+    "MODERATION_PROVIDER": "none"
   },
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "video-template",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_name": "tinydeskai",
+      "database_id": "2974ad76-c9d5-46de-a937-44d4c343dfa1",
       "migrations_dir": "migrations"
     }
   ],
-  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "video-template-media" }],
-  "kv_namespaces": [{ "binding": "KV", "id": "00000000000000000000000000000000" }],
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "tinydeskai-media" }],
+  "kv_namespaces": [{ "binding": "KV", "id": "423d7790170743e5825ea433b42227cb" }],
   "queues": {
-    "producers": [{ "binding": "VIDEO_QUEUE", "queue": "video-template-jobs" }],
+    "producers": [{ "binding": "VIDEO_QUEUE", "queue": "tinydeskai-jobs" }],
     "consumers": [
       {
-        "queue": "video-template-jobs",
+        "queue": "tinydeskai-jobs",
         "max_batch_size": 5,
         "max_batch_timeout": 2,
         "max_retries": 10,
-        "dead_letter_queue": "video-template-jobs-dlq"
+        "dead_letter_queue": "tinydeskai-jobs-dlq"
       },
       // 死信：同一个 Worker 消费，任务判失败、退积分，健康检查据此告警（src/server.ts 按 -dlq 后缀分流）
-      { "queue": "video-template-jobs-dlq", "max_batch_size": 10, "max_batch_timeout": 5, "max_retries": 3 }
+      { "queue": "tinydeskai-jobs-dlq", "max_batch_size": 10, "max_batch_timeout": 5, "max_retries": 3 }
     ]
   },
   "ratelimits": [
-    { "name": "UPLOAD_LIMITER", "namespace_id": "1001", "simple": { "limit": 20, "period": 60 } },
-    { "name": "GENERATE_LIMITER", "namespace_id": "1002", "simple": { "limit": 10, "period": 60 } },
-    { "name": "AUTH_LIMITER", "namespace_id": "1003", "simple": { "limit": 30, "period": 60 } }
+    { "name": "UPLOAD_LIMITER", "namespace_id": "76711", "simple": { "limit": 20, "period": 60 } },
+    { "name": "GENERATE_LIMITER", "namespace_id": "76712", "simple": { "limit": 10, "period": 60 } },
+    { "name": "AUTH_LIMITER", "namespace_id": "76713", "simple": { "limit": 30, "period": 60 } }
   ],
   // Cloudflare Email Service（交易邮件、管理员提醒）。本地 dev / e2e 只模拟发送；不要加 "remote": true，否则会真的发信
   "send_email": [{ "name": "EMAIL" }],

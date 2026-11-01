@@ -43,7 +43,7 @@ const PAYMENT_SECRETS: Record<string, string[]> = {
   dodo: ['DODO_API_KEY', 'DODO_WEBHOOK_SECRET'],
   stripe: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'],
 }
-const VIDEO_SECRETS: Record<string, string[]> = { fal: ['FAL_KEY'], yir: ['YIR_API_KEY'], nanoapi: ['NANOAPI_API_KEY'] }
+const VIDEO_SECRETS: Record<string, string[]> = { fal: ['FAL_KEY'], yir: ['YIR_API_KEY'], nanoapi: ['NANOAPI_API_KEY'], kie: ['KIE_API_KEY'] }
 const MODERATION_SECRETS: Record<string, string[]> = { openai: ['OPENAI_API_KEY'], none: [] }
 const PLACEHOLDER_HOSTS = /(^|\.)(example\.(com|org|net)|localhost)$|^127\.|SUBDOMAIN/i
 
@@ -95,9 +95,20 @@ export function checkConfig(input: ConfigInput): ConfigIssue[] {
   const missingBindings = REQUIRED_BINDINGS.filter((name) => !input.bindings.includes(name))
   if (missingBindings.length) error('bindings', `缺少绑定：${missingBindings.join('、')}`)
 
-  // 只有 Google 登录：不配就没人能登录
-  if (!vars('GOOGLE_CLIENT_ID')) error('GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_ID 为空：站点只有 Google 登录，用户无法登录')
-  else requireSecrets(['GOOGLE_CLIENT_SECRET'], 'Google 登录')
+  // Google is optional for a future email-only site, but the default remains
+  // Google-only until email login is explicitly enabled after its migration.
+  const emailAuth = vars('EMAIL_LOGIN_ENABLED') === 'true'
+  if (!vars('GOOGLE_CLIENT_ID') && !emailAuth) error('GOOGLE_CLIENT_ID', 'Google 与邮箱登录均未配置，用户无法登录')
+  if (vars('GOOGLE_CLIENT_ID')) requireSecrets(['GOOGLE_CLIENT_SECRET'], 'Google 登录')
+  if (emailAuth) {
+    if (!vars('EMAIL_FROM')) error('EMAIL_FROM', '启用邮箱登录需要已验证的发件地址')
+    if (!vars('TURNSTILE_SITE_KEY')) error('TURNSTILE_SITE_KEY', '邮箱验证码登录需要 Turnstile 防止验证码邮件滥用')
+    requireSecrets(['TURNSTILE_SECRET_KEY'], '邮箱登录 Turnstile')
+    // Worker Paid + Email Service can also send, but Resend is the recommended
+    // cross-site provider for inexpensive independent sites.
+    const hasResend = input.secrets.RESEND_API_KEY === true || Boolean(text(input.secrets.RESEND_API_KEY as string | undefined))
+    if (!hasResend) warn('RESEND_API_KEY', '邮箱登录未配置 Resend，请确认 Cloudflare Email Service 能向所有用户真实发信')
+  }
 
   const sessionSecret = input.secrets.SESSION_SECRET
   if (typeof sessionSecret === 'string' && text(sessionSecret) && isWeakSessionSecret(text(sessionSecret))) {
@@ -144,7 +155,7 @@ export function checkConfig(input: ConfigInput): ConfigIssue[] {
 
   const video = vars('VIDEO_PROVIDER')
   if (video === 'mock') error('VIDEO_PROVIDER', 'VIDEO_PROVIDER=mock：生产环境提交生成会返回 503')
-  else if (!VIDEO_SECRETS[video]) error('VIDEO_PROVIDER', `未知的 VIDEO_PROVIDER=${video || '(空)'}，可选 fal、yir、nanoapi`)
+  else if (!VIDEO_SECRETS[video]) error('VIDEO_PROVIDER', `未知的 VIDEO_PROVIDER=${video || '(空)'}，可选 fal、yir、nanoapi、kie`)
   else requireSecrets(VIDEO_SECRETS[video], `${video} 视频生成`)
 
   const moderation = vars('MODERATION_PROVIDER')

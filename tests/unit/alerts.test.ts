@@ -90,6 +90,10 @@ describe('provider_balance', () => {
     const alerts = evaluateHealth(stats({ providerBalance: { provider: 'yir', amount: 9.5, currency: 'USD' } }))
     expect(alerts).toEqual([{ kind: 'provider_balance', count: 1, total: null, windowMinutes: 60, detail: 'yir 余额 9.50 USD' }])
     expect(kinds(stats({ providerBalance: { provider: 'yir', amount: 10, currency: 'USD' } }))).toEqual([])
+    expect(kinds(stats({ providerBalance: { provider: 'Kie.ai', amount: 2500, currency: 'credits', amountUsd: 12.5 } }))).toEqual([])
+    expect(evaluateHealth(stats({ providerBalance: { provider: 'Kie.ai', amount: 1000, currency: 'credits', amountUsd: 5 } }))).toEqual([
+      { kind: 'provider_balance', count: 1, total: null, windowMinutes: 60, detail: 'Kie.ai 余额 1000.00 credits (~$5.00)' },
+    ])
     expect(kinds(stats({ providerBalance: null }))).toEqual([])
   })
 

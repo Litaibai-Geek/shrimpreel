@@ -141,7 +141,7 @@ function VideosPage() {
                   return <StatusPill tone={TONES[shown]}>{d.status[shown] ?? shown}</StatusPill>
                 })()}
                 <span className="text-xs text-muted">
-                  {d.seconds(g.durationSeconds)} · {c.nav.credits(g.creditsCost)}
+                  {g.mode === 'band' ? `${c.generator.modeBand} (${g.memberCount ?? 2}) · ` : ''}{d.seconds(g.durationSeconds)} · {c.nav.credits(g.creditsCost)}
                 </span>
               </div>
               <p className="text-xs text-muted">{formatDate(g.createdAt, locale)}</p>

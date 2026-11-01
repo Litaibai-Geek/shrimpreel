@@ -48,7 +48,7 @@ export function varsKeys(wranglerText) {
 }
 
 export function devVarsKeys(text) {
-  return [...(text ?? '').matchAll(/^\s*#?\s*([A-Z][A-Z0-9_]*)=/gm)].map((m) => m[1])
+  return [...(text ?? '').matchAll(/^\s*#?\s*([A-Z][A-Z0-9_]*)=/gm)].map((m) => m[1]).filter((key) => key !== 'GA4_MEASUREMENT_ID')
 }
 
 const added = (before, after) => after.filter((key) => !before.includes(key))

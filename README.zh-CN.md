@@ -10,6 +10,28 @@ https://github.com/user-attachments/assets/895aab94-d0c9-474e-8d90-61a6c551e536
 
 72 秒功能介绍，无声（[英文版](README.md)；MP4 文件在 [docs/media](docs/media)）。画面来自本地运行，示例站 Neon Shuffle AI 和视频素材都是占位演示。
 
+示例视频默认静音播放，可通过每个视频上的按钮单独打开或关闭声音，并在支持的浏览器中全屏观看。
+
+站点公开配置在 `site.setup.json` 中管理，执行 `npm run setup -- --apply` 写入 `wrangler.jsonc`；缺少 Cloudflare Zone 时可自动创建并输出 nameserver，切换前须核对和迁移 DNS 记录。接着运行数据库迁移并部署。这些命令在未设置环境变量时使用 `.dev.vars.platform` 中的 Cloudflare Token。部署前会检查配置是否同步，不会用运行密钥文件覆盖 Wrangler 配置。
+
+初始化通过 Cloudflare 重定向规则将 www 永久跳转到根域名，保留路径、查询参数和请求方法；Token 需要 DNS 和重定向规则权限。
+
+在 `.dev.vars.production` 填写 `GA4_MEASUREMENT_ID=G-...`，下次部署构建前会同步到站点配置；该公开标识不会作为 Worker secret 上传，留空则关闭 GA4。
+
+上线依次执行 `npm run setup -- --apply`、`npm run db:migrate:remote`、`npm run deploy`。部署前自动运行 doctor、类型检查、单元测试和构建。迁移现有生产数据库前应备份；外部 DNS、支付回调、参考视频和邮件投递仍需配置并验收。
+
+收件转发可在 `site.setup.json` 的 `email.routing` 设置 `enabled: true` 和 `destination`；默认将 `site.adminEmail` 转发至目标邮箱，也可用 `source` 指定本站地址。首次运行 `npm run setup -- --apply` 后，按 Cloudflare 邮件完成目标邮箱验证，再重跑相同命令创建规则并启用路由。需要 Cloudflare 邮件路由地址、规则和 Zone 设置的读写权限；若已有其他服务商的 MX 或冲突规则，脚本会停止并保留现有配置。初始化结束后仍需实际验证投递。
+
+人像上传时，浏览器会将长边超过 2560 像素的照片按比例缩小并压缩为 JPEG。网站同时接收原图以核对下架指纹，审核并保存处理后的图片；原文件仍限 10 MB。单人和多人模式使用同一流程。
+
+生成期间展示真实排队或生成状态、已等待时间和“我的视频”入口；多人模式上传时显示照片上传进度。用户可以离开页面后从个人中心查看结果。
+
+真实支付测试：在 `site.setup.json` 的 `payment` 设置 `testPackageEnabled: true` 和 `createProducts: true`，依次运行 `npm run setup -- --apply` 和 `npm run deploy`，然后使用管理员账号在后台“运营设置”发起 $0.01 / 100 积分的 Waffo 测试支付。该套餐只能由管理员下单，付款和通知都是真实的。测试完成后将开关改为 `false` 并重新执行相同两条命令，停止新下单；Waffo 商品需在其后台另行停用，保留订单和商品映射以处理延迟回调。实际扣款可能含税，具体支付方式的最低金额需以 Waffo 为准。
+
+后台支付连接测试检查在售套餐；订阅关闭时，仍会检查已有订阅或历史订单涉及的订阅套餐，不会把从未出售的订阅套餐当作缺失。
+
+新建的 Resend 发送密钥会立即保存到本地；远端密钥存在但本地无法恢复时，初始化会创建新密钥并保留旧密钥，已有 Worker secret 不会被自动覆盖。
+
 ## 用 ShrimpReel 做的站
 
 <a href="https://christmasdanceai.com/?utm_source=github&utm_medium=referral&utm_campaign=shrimpreel"><img src="docs/media/showcase-christmas-dance-ai.jpg" width="600" alt="Christmas Dance AI：一张照片生成精灵舞或圣诞派对舞视频"></a>
@@ -428,6 +450,8 @@ e2e 覆盖（70 个用例）：
 产物在 `.tmp/video-template-e2e/`：`report/`（HTML 报告，含每步截图和 trace）、`results.json`、`test-results/`。
 
 ## 目录
+
+新站脚本会在文件不存在时创建 setup 和本地生产密钥文件、生成会话密钥，并在站点身份变化时清理旧站的支付和 Turnstile 配置。在 `site.setup.json` 选择视频服务商、审核服务商、发件地址及邮箱登录开关，初始化会写入 `wrangler.jsonc`；邮箱登录需要先完成迁移和真实投递验证。平台管理凭据和运行密钥分别放在各自文件。初始化可从现有 Zone 自动发现 Cloudflare 账户和 Zone ID；离线计划不联网。详见 [bootstrap-site.md](docs/bootstrap-site.md) 和 [bootstrap-v2.md](docs/bootstrap-v2.md)。
 
 ```text
 src/config/site.ts      每个词要改的配置

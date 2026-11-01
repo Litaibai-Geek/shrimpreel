@@ -70,6 +70,7 @@ export function useSession() {
 
 // Google 登录入口：配置了 Google 直接跳 OAuth，否则去登录页（本地 dev 登录）
 export function signInHref(config: ClientConfig | null, redirect: string, signInPath: string) {
+  if (config?.emailLogin) return `${signInPath}?redirect=${encodeURIComponent(redirect)}`
   if (config?.googleClientId) return `/api/auth/google/start?redirect=${encodeURIComponent(redirect)}`
   return `${signInPath}?redirect=${encodeURIComponent(redirect)}`
 }

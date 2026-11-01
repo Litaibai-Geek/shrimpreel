@@ -23,14 +23,13 @@ export function en(s: S) {
   const { ga4Id, cfBeaconToken, umamiWebsiteId } = s.analytics
   // 每种风格的展示名和一句话介绍；site.styles 加风格时这里补一项（缺了 typecheck 报错），zh.ts 同
   const styles: Record<StyleId, StyleCopy> = {
-    'neon-shuffle-v1': { name: k, tagline: 'The original routine, beat for beat.' },
+    'tiny-desk-v1': { name: 'Desk Session', tagline: 'A close, intimate performance setup.' },
   }
   return {
     styles,
     meta: {
-      // 首页 title 不加品牌后缀：品牌通常已含关键词，控制在 60 字符内（seo:check 会校验）
-      homeTitle: `${k} AI Video Generator from One Photo`,
-      homeDescription: `Upload one photo and get your own ${k} video in minutes. Same choreography, same framing, starring you. ${subs ? 'Buy credits once or subscribe monthly.' : 'Pay per video with credits that never expire.'}`,
+      homeTitle: 'Tiny Desk AI Video Generator from a Photo',
+      homeDescription: 'Make a Tiny Desk AI video from one authorized adult photo in Solo or 2–5 photos in Band. Generate a vertical performance in 6, 12 or 15 seconds.',
       pricingTitle: `Pricing – ${b}`,
       pricingDescription: subs
         ? `Credit packs and monthly or yearly plans for ${k} AI videos. Pack credits never expire, cancel a plan anytime, failed renders are refunded automatically.`
@@ -44,11 +43,11 @@ export function en(s: S) {
       refundDescription: `When ${b} returns credits or refunds a credit pack, and how long refunds take to arrive.`,
       reportTitle: `Report content – ${b}`,
       reportDescription: `Report a ${b} video that shows you without consent, involves a minor or infringes your rights. We review every report within ${s.takedownSlaHours} hours.`,
-      ogImageAlt: `${b}: turn one photo into your own ${k} video`,
+      ogImageAlt: `${b}: create a desk-session-style AI performance video from a portrait`,
       breadcrumbHome: 'Home',
     },
     alt: {
-      inputPhoto: `Example input photo for a ${k} AI video`,
+      inputPhoto: 'Portrait photo used as the visual reference for a desk-session AI video',
     },
     nav: {
       features: 'Features',
@@ -67,30 +66,45 @@ export function en(s: S) {
     },
     hero: {
       title: `${k} AI Video Generator`,
-      subtitle: `Turn a single selfie into your own take on the ${k} clip. We keep the choreography, timing and framing of the original and cast you as the lead.`,
-      badge: `Trending on ${s.trendPlatform}`,
-      original: 'Original',
-      aiVersion: 'AI version',
-      chips: ['Same choreography', 'Same framing', 'You as the lead'],
-      creditNote: 'Sample clips are placeholders made for this demo.',
+      subtitle: 'Create a desk-session AI performance with one adult portrait (Solo) or 2–5 authorized portraits (Band). Choose 6, 12 or 15 seconds; the motion reference is supplied for you.',
+      badge: 'Desk-session video creator',
+      original: 'Reference clip',
+      aiVersion: 'Performance preview',
+      chips: ['Solo 1 / Band 2–5 people', 'Reference-guided AI performance', '6 / 12 / 15 seconds'],
+      creditNote: 'The videos above are real AI-generated demos provided by the site owner. Your results may vary with each photo and model run; no original NPR concert footage or licensed song is included.',
     },
+    video: { unmute: 'Turn sound on', mute: 'Mute sound', fullscreen: 'Enter fullscreen', exitFullscreen: 'Exit fullscreen' },
     generator: {
+      modeLabel: 'Creation mode',
+      modeSolo: 'Solo · 1 person',
+      modeBand: 'Band · 2–5 people',
+      bandStepPhoto: 'Select the band members',
+      bandChoose: 'Choose 2–5 photos at once',
+      bandMoveEarlier: 'Move photo to previous role',
+      bandMoveLater: 'Move photo to next role',
+      bandRoleNames: ['Lead singer', 'Keyboard', 'Saxophone', 'Backing singer', 'Drummer'],
+      bandGuidance: 'Choose 2–5 different authorized adult portraits, then use the arrows to put each face in its desired role: lead singer, keyboard, saxophone, backing singer, drummer. JPG/PNG/WebP, up to 10 MB each. AI role matching is not guaranteed. No video upload required.',
+      bandConsent: 'I have explicit permission from every adult in these photos. All people are at least 18 and none are celebrities or public figures.',
+      bandShortWarning: 'Six seconds may not show every member. We recommend 12 or 15 seconds for Band mode.',
       // 只给读屏用（sr-only），不放关键词，避免隐藏文字堆词
       title: 'Create your video',
-      stepPhoto: 'Your photo',
+      stepPhoto: 'Your portrait',
       dropTitle: 'Drop a photo or click to upload',
       dropHint: 'JPG, PNG or WebP · up to 10 MB',
-      guidance: 'Best results: one person, facing the camera, even lighting, head and shoulders visible. Avoid sunglasses, masks and heavy filters.',
+      guidance: 'For the clearest result, use a sharp photo of one adult facing the camera, with the face unobstructed and the upper body visible. Avoid group photos, sunglasses, masks and heavy filters. No video upload is needed; the performance reference clip is provided automatically.',
       change: 'Change photo',
       uploading: 'Uploading…',
-      uploaded: 'Photo ready',
-      stepStyle: 'Dance style',
-      stepLength: 'Length',
+      bandUploading: (current: number, total: number) => `Uploading photo ${current} of ${total}…`,
+      uploaded: 'Photo uploaded',
+      localPhotoReady: 'Photo selected',
+      signInNote: 'After Google sign-in, please select your photo again. For privacy, local photo files are not carried across the login redirect.',
+      stepStyle: 'Performance scene',
+      stepLength: 'Clip length',
       seconds: (n: number) => `${n} s`,
       full: 'full',
       creditsLabel: (n: number) => `${n} credits`,
-      consent: 'This photo is of me, or I have permission from the person in it. They are 18 or older and not a celebrity or public figure.',
-      ctaSignUp: 'Sign up free and start',
+      consent: 'This photo is of me, or I have permission from the adult person in it. They are 18 or older and not a celebrity or public figure.',
+      ctaSignUp: 'Sign in to continue',
       ctaGenerate: (n: number) => `Generate video · ${n} credits`,
       ctaBuy: 'Get credits to generate',
       ctaBuyPack: (credits: number, price: string) => `Get ${credits} credits · ${price}`,
@@ -99,99 +113,96 @@ export function en(s: S) {
       needMore: (n: number) => `You need ${n} more credits for this length.`,
       needPhoto: 'Add a photo first.',
       needConsent: 'Please confirm the consent box.',
-      queued: 'In the queue…',
-      processing: 'Rendering your video. This usually takes a few minutes; you can leave this page.',
+      queued: 'Your video is in the queue',
+      processing: 'Creating your performance',
+      elapsed: (time: string) => `Elapsed ${time}`,
+      waitingBody: 'Video creation can take a while. You can leave this page and find your video in My videos.',
+      waitingLong: 'Your video is still processing. Check My videos again later.',
       succeeded: 'Your video is ready',
       failed: 'This render failed.',
       refunded: 'The credits have been returned to your balance.',
       download: 'Download MP4',
       viewAll: 'Open My videos',
       makeAnother: 'Make another',
-      aiNotice: 'This video is AI-generated. Keep the label and say it is AI when you share it.',
+      aiNotice: 'This is an AI-generated video. Keep the AI label and disclose that it is AI when you share it.',
       expiresOn: (date: string) => `Download it before ${date}. Videos are deleted automatically after that.`,
     },
     madeWith: {
       eyebrow: `Made with ${b}`,
-      title: 'One photo in, one finished clip out',
-      body: 'No editing timeline, no green screen. Upload a clear photo, choose a length and the render keeps every beat of the original routine.',
-      photoLabel: 'Uploaded photo',
-      resultLabel: 'Generated clip',
+      title: 'From one portrait to a desk-session video',
+      body: 'A reference clip guides the movement and framing while your portrait provides the person to feature. Review the result before sharing—AI-generated details can vary.',
+      photoLabel: 'Uploaded portrait',
+      resultLabel: 'AI-generated result',
     },
     problem: {
-      eyebrow: 'The catch',
-      title: `Joining the ${k} trend is harder than it looks`,
+      eyebrow: 'The setup',
+      title: 'Why filming a desk-session performance takes planning',
       items: [
-        { title: 'You have to learn the routine', body: 'Getting every move right takes real practice, and nerves still show once the camera is rolling.' },
-        { title: 'Someone has to film it', body: 'You need a friend or a tripod, plus a background that matches the framing of the original.' },
-        { title: 'The timing is unforgiving', body: 'Half a beat late looks obvious next to the original, so it turns into take after take.' },
+        { title: 'Build the scene', body: 'A desk, microphone, instruments, soft lighting and a close camera angle all need to work together.' },
+        { title: 'Get the framing right', body: 'A tight shot can crop hands or instruments; a wide shot can lose the intimate, room-scale feel.' },
+        { title: 'Capture a usable take', body: 'Movement, posture and camera timing can take repeated attempts to look natural in a short clip.' },
       ],
     } as ProblemBlock | null,
     withWithout: {
-      eyebrow: 'Side by side',
-      title: `Filming it yourself vs. using ${b}`,
+      eyebrow: 'Two ways to create',
+      title: `Filming a desk-session video vs. using ${b}`,
       without: 'Filming it yourself',
       with: `With ${b}`,
       rows: [
-        { without: 'Learn the choreography first', with: 'No dancing needed, one photo is enough' },
-        { without: 'Find a friend or set up a tripod', with: 'No camera setup' },
-        { without: 'Retake until the timing lines up', with: 'Timing follows the original clip' },
-        { without: 'Edit and export on your phone', with: 'Download a finished MP4' },
+        { without: 'Set up a desk, microphone and lighting', with: 'Start with a portrait and a reference clip' },
+        { without: 'Plan the camera position and framing', with: 'The reference clip guides movement and framing' },
+        { without: 'Repeat takes to capture a clean performance', with: 'Generate a short AI version to review' },
+        { without: 'Edit and export the final file', with: 'Download the generated MP4' },
       ],
     } as WithWithoutBlock | null,
-    // 首页关键词区块（one-page SEO）：H2 带关键词，上新词时按趋势本身重写 whatIs
     howTo: {
       eyebrow: 'How it works',
       title: `How to make a ${k} AI video in 3 steps`,
       steps: [
-        { title: 'Upload one clear photo', body: 'One person, facing the camera, in even light. JPG, PNG or WebP up to 10 MB.' },
-        { title: 'Choose a length', body: 'Take a short hook or the full routine. One credit covers one second of video.' },
-        { title: 'Generate and download', body: 'The render finishes in a few minutes. Download the MP4 without a watermark and post it anywhere.' },
+        { title: 'Choose Solo or Band portraits', body: 'Upload one clear authorized adult photo for Solo, or 2–5 different authorized adult photos for Band. JPG, PNG or WebP up to 10 MB each.' },
+        { title: 'Choose a clip length', body: 'Select a 6, 12 or 15-second option. One credit covers one second of generated video.' },
+        { title: 'Generate, review and download', body: 'Start the render, then review the result for visual artifacts before downloading the MP4. Processing time depends on clip length and queue.' },
       ],
-      cta: 'Start with your photo',
+      cta: 'Start with your portrait',
       guide: 'Read the step-by-step guide',
     },
     whatIs: {
-      eyebrow: 'About the trend',
-      title: `What is ${k}?`,
+      eyebrow: 'The format',
+      title: `What is a ${k} AI video?`,
       paragraphs: [
-        `${k} is a short vertical clip that people re-create with their own face and style. The routine is quick, the beat is easy to recognise and the camera stays on a single performer, so every new version instantly reads as part of the trend.`,
-        `${b} is an AI dance video generator built around that one clip. Instead of learning the steps and filming, you upload a single photo and the model renders you performing the original routine with the same timing and framing.`,
+        'The Outstanding Tiny Desk AI meme popularized AI edits of a tightly framed desk-band setting in October 2026. This site makes an original one-person performance-style clip rather than reproducing NPR footage or the copyrighted Outstanding recording.',
+        `The Tiny Desk AI generator on ${b} uses a portrait and a reference performance clip to create a new vertical video. The reference guides movement and framing; the portrait guides the person shown. Results vary, so inspect the video before sharing. This is an independent tool, not an official concert production.`,
       ],
-      guide: `Read the full ${k} trend guide`,
+      guide: 'Read how the desk-session AI format works',
     },
     features: {
       eyebrow: 'Features',
-      title: `Everything you need for a ${k} clip`,
+      title: 'Tiny Desk AI video generator features',
       items: [
-        { title: 'One photo is enough', body: 'A single clear selfie is all the model needs to rebuild you inside the routine.' },
-        { title: 'Faithful motion', body: 'Every step, pause and camera move follows the reference clip frame by frame.' },
-        { title: 'Vertical and ready to post', body: `Exports in ${s.template.aspectRatio} so it drops straight into Reels, Shorts or ${s.trendPlatform}.` },
-        { title: 'Pick your length', body: 'Grab a short hook or the full routine. You only pay for the seconds you render.' },
+        { title: 'One portrait to start', body: 'Use a clear photo of one consenting adult as the visual reference for your clip.' },
+        { title: 'Reference-guided movement', body: 'The source performance guides the motion and framing of the generated desk-session scene.' },
+        { title: 'Vertical video format', body: `The output uses ${s.template.aspectRatio} framing for a compact, social-ready Tiny Desk-style AI video.` },
+        { title: 'Three clip lengths', body: 'Choose 6, 12 or 15 seconds and pay according to the generated duration.' },
         { title: 'Private by default', body: `Uploads are stored privately, used only for your render and ${photoRetention}.` },
-        {
-          title: 'Fair billing',
-          body: subs
-            ? 'Credit packs never expire and plans can be canceled anytime. If a render fails, the credits go straight back to your balance.'
-            : 'Credits never expire. If a render fails, the credits go straight back to your balance.',
-        },
+        { title: 'Clear credit rules', body: 'Credit packs are one-time purchases and never expire. If a render fails, the credits are returned automatically.' },
       ],
     },
     ideas: {
-      eyebrow: 'Ideas',
-      title: 'What people make with it',
+      eyebrow: 'Creative uses',
+      title: 'Ideas for an AI Tiny Desk performance',
       items: [
-        { title: 'Surprise the group chat', body: 'Drop yourself into the routine and send it before anyone else jumps on the trend.' },
-        { title: 'Birthday shout-outs', body: 'Use a friend’s photo (with their OK) and turn it into a dance-floor greeting card.' },
-        { title: 'Creator content in minutes', body: 'Ride the trend on your channel without filming, lighting or learning the steps.' },
+        { title: 'A personal music-themed post', body: 'Create a playful performance visual for a social post, and label it clearly as AI-generated.' },
+        { title: 'A creator concept preview', body: 'Explore a desk-session look for a channel intro or creative concept before arranging a real shoot.' },
+        { title: 'A shareable fan edit', body: 'Make a lighthearted visual to send to friends. Use only your own photo or an adult photo you have permission to use.' },
       ],
-      cta: 'Try it with your photo',
+      cta: 'Create a performance video',
     },
     pricing: {
       eyebrow: 'Pricing',
       title: subs ? 'Pay as you go, or subscribe' : 'Pay once, use whenever',
       subtitle: subs
         ? '1 credit = 1 second of video. Buy a pack that never expires, or subscribe for a fresh allowance every month.'
-        : '1 credit = 1 second of video. No subscription, no expiry.',
+        : 'A 15-second video uses 15 credits. One-time credit packs never expire; no subscription required.',
       popular: 'Most popular',
       // 锚定价（site.packages[].anchorPriceCents）的划线原价和折扣
       was: 'Regular price',
@@ -204,14 +215,14 @@ export function en(s: S) {
       credits: (n: number) => `${n} credits`,
       makes: (items: { videos: number; seconds: number }[]) =>
         `Makes ${items.map((i) => `${i.videos} × ${i.seconds}s`).join(' or ')} ${items.length === 1 && items[0]!.videos === 1 ? 'video' : 'videos'}`,
-      bullets: ['Credits never expire', 'All video lengths', 'HD MP4 download, no watermark', 'Automatic refund on failed renders'],
+      bullets: ['Credits never expire', '6, 12 or 15-second clips', 'MP4 download', 'Automatic refund on failed renders'],
       note: 'Prices in USD. Taxes are calculated at checkout by our payment partner.',
       // 价格页底部的教程链接
-      guide: `Before you buy: how to get a great ${k} video`,
+      guide: 'Before you create: Tiny Desk AI photo and clip tips',
       packages: {
-        starter: { name: 'Starter', tagline: 'Try the trend' },
-        party: { name: 'Party', tagline: 'For you and your friends' },
-        squad: { name: 'Squad', tagline: 'For creators and teams' },
+        starter: { name: 'Starter', tagline: 'Try a short clip' },
+        party: { name: 'Creator', tagline: 'Make a few versions' },
+        squad: { name: 'Studio', tagline: 'For repeat creators' },
       } as Record<string, { name: string; tagline: string }>,
       // 订阅套餐（site.plans）
       plansTitle: 'Subscriptions',
@@ -231,40 +242,28 @@ export function en(s: S) {
     },
     faq: {
       title: 'Questions, answered',
-      body: 'Still unsure? Our team replies within one business day.',
+      body: 'Need help with a render or payment? Contact our team.',
       cta: 'Contact support',
       items: [
-        {
-          q: `What is ${b}?`,
-          a: `${b} is an online tool that recreates the ${k} video with you as the performer, using just one photo.`,
-          guide: { article: 'trend', label: `Where the ${k} clip came from` },
-        },
-        {
-          q: 'Which photo works best?',
-          a: 'A recent photo of one person facing the camera, with even light and the head and shoulders in frame. Group shots, sunglasses and strong filters lower the quality.',
-          guide: { article: 'howTo', label: `Photo tips for a better ${k} AI video` },
-        },
-        { q: 'How long does a render take?', a: 'Most videos finish in 2–8 minutes depending on length and queue. You can close the page; finished videos wait in My videos.' },
-        {
-          q: 'How do credits work?',
-          a: subs
-            ? 'Each second of video costs one credit. Credits from packs never expire; subscription credits are added every month and expire at the end of that month. Renders use the credits that expire soonest first, and credits are refunded automatically if a render fails.'
-            : 'Each second of video costs one credit. Credits are bought in packs, never expire and are refunded automatically if a render fails.',
-        },
-        ...(subs
-          ? [{ q: 'How do I cancel my subscription?', a: 'Open My account → Billing and choose Cancel renewal. You won’t be charged again, and your plan and credits stay available until the end of the current period.' }]
-          : []),
-        { q: 'Can I use someone else’s photo?', a: 'Only with their permission, and never photos of minors, celebrities or public figures. Accounts that break this rule are closed.' },
+        { q: 'What is the Outstanding Tiny Desk AI trend?', a: 'It is an October 2026 AI parody trend inspired by the desk-band setting of Charlie Wilson’s 2023 NPR Tiny Desk performance of Outstanding. Our independent one-photo generator makes a new desk-session-style video rather than reproducing the original show or song.', guide: { article: 'trend', label: 'Learn the origin of the Outstanding Tiny Desk meme' } },
+        { q: 'Does this use the original Outstanding song?', a: 'No. The generator requests AI-created audio and does not include the original Charlie Wilson recording or guarantee a particular song.' },
+        { q: 'Can I upload five different performers?', a: 'Yes. Choose Band mode and upload 2–5 distinct consenting adult portraits in the displayed singer, keyboard, saxophone, backing singer and drummer order. The AI tries to assign roles but cannot guarantee exact identity mapping.' },
+        { q: 'What photo works best?', a: 'Use a sharp, front-facing photo of one adult with the face unobstructed and the upper body visible. Avoid group photos, sunglasses, masks and heavy filters.', guide: { article: 'howTo', label: 'Photo tips for a Tiny Desk AI video' } },
+        { q: 'Is Tiny Desk AI affiliated with NPR?', a: 'No. Tiny Desk AI is an independent creative tool and is not affiliated with NPR, the Tiny Desk Concert series, any artist, venue or rights holder.' },
+        { q: 'Will the generated video match my photo perfectly?', a: 'No AI video can guarantee an exact result. Motion, hands, instruments, clothing and facial details may vary. Review the MP4 before sharing.' },
+        { q: 'How long does a render take?', a: 'Processing time depends on the clip length, model availability and queue. You can leave the page; completed videos appear in My videos.' },
+        { q: 'How do credits work?', a: 'Each second of video costs one credit. Credits are bought in one-time packs, never expire and are refunded automatically if a render fails.' },
+        { q: 'Can I use someone else’s photo?', a: 'Only with explicit permission from the adult shown. Do not upload photos of minors, celebrities or public figures.' },
         { q: 'What happens to my photos?', a: `Uploads are private, used only to make your video and ${photoRetention}. Finished videos are ${videoRetention}. Deleting your account removes everything right away.` },
       ] as FaqItem[],
     },
     finalCta: {
-      title: `Your ${k} moment is one photo away`,
-      body: 'Upload a selfie, pick a length and watch yourself take the lead.',
+      title: 'Make your own desk-session video',
+      body: 'Start with one portrait, choose a clip length and review your AI-generated performance.',
       cta: 'Create my video',
     },
     footer: {
-      statement: `${b} is an independent project and is not affiliated with ${s.trendPlatform} or the creators of the original trend.`,
+      statement: `${b} is an independent AI video project. It is not affiliated with NPR, the Tiny Desk Concert series, ${s.trendPlatform}, any artist, venue or rights holder.`,
       resources: 'Resources',
       legal: 'Legal',
       contact: 'Contact',
@@ -273,7 +272,6 @@ export function en(s: S) {
       refund: 'Refund Policy',
       report: 'Report content',
       rights: `© ${new Date().getFullYear()} ${b}. All rights reserved.`,
-      // 页脚“问问 AI”：llms.txt 链接 + 几个带预填提问的 AI 按钮
       agentDocs: 'AI & agent docs',
       askAi: `See what ChatGPT, Claude, Perplexity, Gemini or Grok say about ${b}.`,
       askAiLabel: (ai: string) => `Ask ${ai} about ${b}`,
@@ -293,13 +291,40 @@ export function en(s: S) {
     },
     signIn: {
       title: `Sign in to ${b}`,
-      body: 'Use your Google account. New here? An account is created automatically.',
+      body: 'Sign in with Google or a one-time code sent to your email. Google accounts can enable email login from Settings after signing in.',
       google: 'Continue with Google',
+      emailTitle: "Continue with email",
+      emailHint: "We send an 8-digit code that expires in 10 minutes. Existing Google accounts must enable email login from account settings first.",
+      emailSendCode: "Send verification code",
+      emailCodeSent: "Check your inbox for the verification code.",
+      emailVerifyCode: "Verify and continue",
+      emailTryAgain: "Use another code",
+      emailCodeLabel: "8-digit code",
+      emailLinkTitle: "Enable email sign-in",
+      emailLinkHint: "Keep your Google account and verify this address to enable an additional sign-in method.",
+      emailLinked: "Email sign-in is enabled for this account.",
       devTitle: 'Developer login (local only)',
       devEmail: 'Email',
       devSubmit: 'Sign in as this email',
       legal: 'By continuing you agree to our Terms of Service and Privacy Policy.',
       notConfigured: 'Google sign-in is not configured yet.',
+      // 密码模式文案
+      signUpTitle: `Sign up for ${b}`,
+      name: 'Name',
+      namePlaceholder: 'Enter your name (optional)',
+      email: 'Email',
+      emailPlaceholder: 'Enter your email',
+      password: 'Password',
+      passwordPlaceholder: 'At least 8 characters',
+      confirmPassword: 'Confirm Password',
+      confirmPasswordPlaceholder: 'Re-enter your password',
+      signUp: 'Sign Up',
+      signIn: 'Sign In',
+      alreadyHaveAccount: 'Already have an account?',
+      signInLink: 'Sign in',
+      noAccount: "Don't have an account?",
+      signUpLink: 'Sign up',
+      orContinueWith: 'Or continue with',
     },
     dashboard: {
       title: 'My account',
@@ -468,9 +493,9 @@ export function en(s: S) {
     share: {
       title: `An AI video made with ${b}`,
       goneTitle: `Video unavailable – ${b}`,
-      description: `Watch this AI-generated ${k} video, then turn one photo into your own.`,
+      description: 'Watch this AI-generated desk-session video, then create a version from your own portrait.',
       heading: `Made with ${b}`,
-      body: `This ${k} video was generated by AI from a single photo. Upload yours to make your own.`,
+      body: 'This desk-session-style video was generated from a portrait and a reference clip. It is not footage of a real live performance.',
       disclosure: 'This video is AI-generated and does not show real events.',
       cta: 'Make your own',
       reportPrompt: 'Shows you without consent or breaks our rules?',
@@ -496,10 +521,10 @@ export function en(s: S) {
     // 文章列表页 /guides
     guides: {
       nav: 'Guides',
-      title: `${k} guides`,
-      metaTitle: `${k} AI Video Guides – ${b}`,
-      description: `Guides to the ${k} trend and to making your own ${k} AI video: where it came from, which photos work best and step-by-step tips.`,
-      intro: `Background on the ${k} trend and practical tips for turning one photo into a ${k} AI video.`,
+      title: 'Tiny Desk AI guides',
+      metaTitle: 'Tiny Desk AI Video Guides – Tiny Desk AI',
+      description: 'Practical guides to the Tiny Desk AI video format, choosing a portrait, selecting a clip length and reviewing an AI-generated result.',
+      intro: 'Explore the Outstanding Tiny Desk AI trend, then learn to make a Solo or Band performance, choose an output duration and review your result.',
       related: 'Related guides',
     },
     errors: {
@@ -516,12 +541,29 @@ export function en(s: S) {
       file_too_large: 'That file is larger than 10 MB.',
       length_required: 'Your browser sent the file in a way we can’t accept. Please try again in another browser.',
       unsupported_file_type: 'Please upload a JPG, PNG or WebP image.',
+      image_processing_failed: 'We could not prepare this photo. Please try another image or browser.',
       invalid_upload: 'Please upload the photo again.',
-      invalid_style: 'That dance style isn’t available. Please pick another one.',
+      band_invalid: 'Band mode requires 2–5 distinct adult portraits. Please reselect your photos.',
+      band_duplicate: 'This image is repeated. Please use a different portrait for each member.',
+      band_provider_unavailable: 'Band generation is temporarily unavailable. Please try Solo or come back later.',
+      invalid_style: 'That performance template is not available. Please try again later.',
       queue_unavailable: 'Our render queue is busy. Your credits were returned; please try again.',
       payment_not_configured: 'Payments are not available right now.',
       payment_provider_error: 'The payment provider did not respond. Please try again.',
       invalid_email: 'Please enter a valid email address.',
+      email_login_unavailable: "Email sign-in is not configured yet.",
+      email_code_invalid: "Invalid or expired code. Request a new one.",
+      email_delivery_unavailable: "We could not send the verification email. Try again later.",
+      email_link_not_allowed: "This email cannot be used for code sign-in yet. If it is a Google account, sign in with Google first and enable email sign-in in Settings.",
+      // 密码模式错误提示
+      password_too_short: "Password must be at least 8 characters",
+      password_too_long: "Password is too long",
+      password_mismatch: "Passwords do not match",
+      invalid_password: "Invalid password",
+      invalid_credentials: "Invalid email or password",
+      email_already_exists: "This email is already registered",
+      ip_already_registered: "An account has already been registered from this IP address. Please sign in or use Google sign-in.",
+      admin_cannot_register: "Admin accounts must use Google sign-in",
       invalid_message: 'Please write between 10 and 5000 characters.',
       generation_in_progress: 'This video is still rendering.',
       google_not_configured: 'Google sign-in is not configured.',
@@ -551,12 +593,12 @@ export function en(s: S) {
       account_conflict: `This email is linked to a different Google account. Sign in with that account, or email ${s.supportEmail} for help.`,
     } as Record<string, string>,
     legal: {
-      updated: '2026-10-21',
+      updated: '2026-10-31',
       privacy: {
         title: 'Privacy Policy',
         sections: [
-          { h: 'What we collect', p: [`When you sign in we receive your name, email address and profile picture from Google. When you create a video we store the photo you upload and the video we generate. Payment details are handled by our payment partner; ${b} never sees your card number.`] },
-          { h: 'How we use it', p: ['Your photo is used only to render the video you request. We use your email to operate your account, send receipts and service notices (such as when your video is ready or a report you filed is resolved) and answer support requests. We do not send marketing email. We do not sell personal data and do not use your photos to train models.'] },
+          { h: 'What we collect', p: [`When you sign in we receive your name, email address and profile picture from Google. For Solo we store one uploaded portrait; for Band we store 2–5 uploaded member portraits, their role order and the generated video. Payment details are handled by our payment partner; ${b} never sees your card number.`] },
+          { h: 'How we use it', p: ['Your uploaded photos are used only to render the videos you request. We use your email to operate your account, send receipts and service notices (such as when your video is ready or a report you filed is resolved) and answer support requests. We do not send marketing email. We do not sell personal data and do not use your photos to train models.'] },
           { h: 'Storage and retention', p: [`Files are stored with our infrastructure provider in encrypted form. Uploaded photos are ${photoRetention} and generated videos are ${videoRetention}, unless you delete them or your account sooner. Order and payment records are kept as required for tax and accounting. When you delete your account we keep only a one-way hash of your email address, so the same email cannot claim the sign-up bonus twice.`] },
           { h: 'Safety checks', p: ['Before a photo is used it may be checked by an automated content-safety classifier. The check runs only to enforce our rules, and its result is not used for anything else. Public forms are protected by a bot-detection service that may process your IP address and browser signals.'] },
           {
@@ -588,14 +630,14 @@ export function en(s: S) {
                 },
               ]
             : []),
-          { h: 'Service providers', p: [`We rely on a small number of processors: cloud hosting, storage and email delivery, an AI rendering provider that processes your photo only for your request, a content-safety classifier, a payment provider acting as merchant of record${ga4Id || cfBeaconToken || umamiWebsiteId ? ', and the analytics services described above' : ''}.`] },
+          { h: 'Service providers', p: [`We rely on a small number of processors: cloud hosting, storage and email delivery, Kie.ai, which provides access to ByteDance's Seedance 2.0 Mini model and processes the one Solo or multiple Band portraits you upload, along with the site's selected reference clip, to render your request, a content-safety classifier, a payment provider acting as merchant of record${ga4Id || cfBeaconToken || umamiWebsiteId ? ', and the analytics services described above' : ''}.`] },
           { h: 'Your rights', p: [`You can download or delete your videos at any time. In Settings you can export a copy of your data as JSON or delete your account. For any other privacy request, email ${s.supportEmail}.`] },
         ],
       },
       terms: {
         title: 'Terms of Service',
         sections: [
-          { h: 'Using the service', p: [`${b} lets you create short AI videos from a photo. You must be at least 18 years old, or the age of majority where you live, to use it.`] },
+          { h: 'Using the service', p: [`${b} lets you create short AI videos from one authorized photo (Solo) or 2–5 authorized photos (Band). You must be at least 18 years old, or the age of majority where you live, to use it.`] },
           { h: 'Your content and consent', p: ['Only upload photos of yourself or of adults who have given you permission. Do not upload photos of minors, celebrities or public figures, and do not use the service to harass, impersonate or deceive anyone. We may remove content and close accounts that break these rules.'] },
           { h: 'Generated videos', p: ['You may use the videos you create for personal and social media purposes. AI output can contain mistakes; review a video before sharing it. Videos are labelled as AI-generated: keep that label, say the video is AI-generated when you share it and never present it as real footage of an event.'] },
           { h: 'Reports and removal', p: [`Anyone can report content through our report page. We review reports and remove content that breaks these terms or someone’s rights within ${s.takedownSlaHours} hours. Removed photos are blocked from being uploaded again, and accounts involved in serious or repeated violations may be closed without a refund of used credits.`] },
@@ -635,24 +677,53 @@ export function en(s: S) {
     },
     articles: {
       trend: {
-        title: `What is the ${k} trend?`,
-        description: `Where the ${k} clip came from, why it spread and how to join in with an AI version of yourself.`,
-        intro: `The ${k} clip is a short vertical dance video that turned into a template: people re-create the same routine, beat for beat, and post their own version.`,
+        title: 'Outstanding Tiny Desk AI Trend Explained',
+        description: 'Where the Outstanding Tiny Desk AI meme came from, why the desk-band edits went viral in October 2026, and what this one-photo generator can do.',
+        intro: 'The Outstanding Tiny Desk AI trend is a viral AI parody format, not a new concert. It draws on a real 2023 NPR Music desk performance and uses unexpected faces in band scenes. This site offers an independent, one-photo desk-session-style AI video, not an exact copy of that concert or its soundtrack.',
         sections: [
-          { h: 'Why it caught on', p: ['The routine is short, the timing is easy to recognise and the camera work is simple enough that the performer is always the focus. That makes every new version feel like a fresh take on the same joke.'] },
-          { h: 'How people join in', p: ['Some learn the steps and film themselves. Others use AI to place themselves in the original clip, which keeps the exact timing and camera moves without filming anything.'] },
-          { h: 'Do it with AI', p: [`With ${b} you upload one photo and receive a vertical video in which you perform the routine. Choose a short hook or the full length and share it straight away.`] },
+          { h: 'What is the Outstanding Tiny Desk AI trend?', p: [
+            'NPR Music published Charlie Wilson: Tiny Desk Concert on June 5, 2023. The set closes with Outstanding, a song associated with The Gap Band. The crowded room, musicians, microphones and close camera framing make that live performance memorable.',
+            'In October 2026, AI parodies began circulating that put unexpected people into a desk-band scene. Sports-themed edits featuring college football coaches became a widely shared version of the joke. These clips are edited or AI-generated parodies, not recordings of those people performing at NPR.'
+          ] },
+          { h: 'Why the October 2026 meme spread', p: [
+            'The joke comes from a contrast: people who have had a rough day appear to be joyfully performing a song called Outstanding. The tight concert setting, reactions and musician close-ups make the format easy to recognize in a short social video.',
+            'Different edits highlight the lead singer, backing musicians, keyboard and saxophone. The original viral examples vary by creator, and reposted view counts or claims about the first upload should not be treated as verified facts without their original posts.'
+          ] },
+          { h: 'The video effect people are trying to make', p: [
+            'People looking for an Outstanding Tiny Desk AI template often want the recognizable ensemble scene: a desk-side band, expressive singing close-ups, warm studio lighting, keys and a saxophone moment. A five-person face-replacement edit is a different workflow from generating a new scene with a single portrait.',
+            'This website offers Solo for one authorized adult portrait and Band for 2–5 different adult portraits. Both use a desk-session style and offer 6, 12 or 15-second vertical outputs. Band role assignments are approximate: we do not promise an exact shot-by-shot recreation or include the original Outstanding recording.'
+          ] },
+          { h: 'How to make an original desk-session AI video', p: [
+            'Sign in with Google, select one clear portrait of yourself or an adult who gave permission, and choose the output length. You do not need to upload an additional video: the site supplies a motion-reference clip automatically.',
+            'Once rendering finishes, open My videos to play or download the MP4. The video model can change facial details, hands, instruments or timing between frames, so inspect the full result before sharing it.'
+          ] },
+          { h: 'Who owns the music and original concert?', p: [
+            'The original NPR Tiny Desk concert and the song Outstanding belong to their respective rights holders. This independent service does not supply the concert video, claim affiliation with NPR, or promise that its AI audio reproduces the original song.',
+            'Use music you are entitled to use when posting on TikTok, Instagram or elsewhere. Do not pass an AI parody off as a genuine performance, and do not upload images of minors, celebrities or public figures.'
+          ] },
         ],
       },
       howTo: {
-        title: `How to make a ${k} AI video`,
-        description: `A step-by-step guide to making your own ${k} video from a single photo.`,
-        intro: `You can create your own ${k} video in about five minutes. Here is the full process and a few tips for the best result.`,
+        title: 'How to Make a Tiny Desk AI Video from a Photo',
+        description: 'Sign in, upload one portrait, select 6, 12 or 15 seconds, generate an original desk-session video and download your MP4. No video upload required.',
+        intro: 'Solo uses one permitted adult portrait; Band uses 2–5 different permitted adult portraits. The motion-reference video is built into the generator, so no video upload is required. These AI performances do not reproduce the original Outstanding concert.',
         sections: [
-          { h: '1. Pick the right photo', p: ['Choose a recent, sharp photo of one person looking at the camera. Even daylight works best. Avoid sunglasses, hats that cover the face and beauty filters.'] },
-          { h: '2. Upload and choose a length', p: ['Sign in, drop the photo into the generator and pick a length. Shorter clips render faster and cost fewer credits; the full version follows the complete routine.'] },
-          { h: '3. Confirm consent and generate', p: ['Tick the consent box to confirm the photo is yours or that you have permission, then start the render. You can leave the page while it works.'] },
-          { h: '4. Download and share', p: ['When the video is ready, download the MP4 from the generator or from My videos and post it wherever you like.'] },
+          { h: '1. Sign in, then select your photo', p: [
+            'Sign in with Google to keep your uploaded photo and result in your own account. If you selected a photo before signing in, choose it again after returning; for privacy, the browser does not transfer your local file through the login redirect.',
+            'Use JPG, PNG or WebP up to 10 MB. A clear, well-lit portrait with the face visible and some upper body in the frame gives the model better reference information. Only use yourself or an adult who has agreed.'
+          ] },
+          { h: '2. Pick a generated-video length', p: [
+            'Choose 6, 12 or 15 seconds. Each output second costs one credit, so a 15-second render uses 15 credits. The reference-performance clip is selected by the site automatically; there is no separate user video-upload step.',
+            'The currently supported output is vertical 9:16. Solo uses one portrait; Band uses 2–5 separate portraits in role order, but it is not a frame-accurate multi-cast video editor.'
+          ] },
+          { h: '3. Start the render and check progress', p: [
+            'Confirm permission to use the photo, ensure your account has sufficient credits, and submit the generation task. Video creation is asynchronous. You may leave the page and check My videos while the render is processing.',
+            'The model is asked to generate audio with the performance. Audio quality, lip movement and visual consistency can vary; the service does not promise any particular licensed song or an exact recreation of a viral meme.'
+          ] },
+          { h: '4. Review the MP4, download and share', p: [
+            'Watch the result from start to finish. Check the face, fingers, microphone, instruments, pacing and sound for visible or audible errors. A completed file can be downloaded from the generator or My videos.',
+            'Generated videos are retained for 30 days under the current site policy. Label the result as AI-generated and share only when you have the necessary rights. If a render fails, spent generation credits are automatically returned.'
+          ] },
         ],
       },
     } satisfies Record<ArticleKey, ArticleContent>,

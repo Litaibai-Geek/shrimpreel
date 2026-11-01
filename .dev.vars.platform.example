@@ -1,0 +1,4 @@
+# Copy to .dev.vars.platform (gitignored), keep only on the local computer.
+# High-privilege keys must NEVER be copied to Worker secrets or site.setup.json.
+CLOUDFLARE_API_TOKEN=
+RESEND_ADMIN_API_KEY=

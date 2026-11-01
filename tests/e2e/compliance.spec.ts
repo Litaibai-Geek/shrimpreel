@@ -166,6 +166,60 @@ test('举报下架：匿名在 /report 举报 → 管理员下架 → 同一原�
   await shot('04-owner-dashboard')
 })
 
+test('Band 举报按指定成员下架：命中其他 Band 的第二位成员与 Solo 副本，不误拉黑其他乐手', async ({ page, browser }) => {
+  const request = page.request
+  await devLogin(request, uniqueEmail('band-takedown'))
+  await buyPackage(request, 'starter')
+  const a = uniquePhoto(), b = uniquePhoto(), c = uniquePhoto(), d = uniquePhoto()
+  const [aId, bId, cId, dId, bCopy] = [
+    await upload(request, a), await upload(request, b), await upload(request, c),
+    await upload(request, d), await upload(request, b),
+  ] as const
+
+  const reported = (await json<{ generation: Generation }>(
+    post(request, '/api/generations', { mode: 'band', uploadIds: [aId, bId, cId], durationId: 'short' }), 201
+  )).generation.id
+  const sharedBand = (await json<{ generation: Generation }>(
+    post(request, '/api/generations', { mode: 'band', uploadIds: [dId, bCopy], durationId: 'short' }), 201
+  )).generation.id
+  const kept = await generate(request, cId)
+  for (const id of [reported, sharedBand, kept]) await succeeded(request, id)
+
+  const reportId = (await json<{ report: { id: string } }>(
+    post(request, '/api/takedowns', {
+      name: 'Band Reporter', email: 'reporter@example.com', contentRef: reported,
+      reason: 'impersonation', attest: true,
+    }), 201,
+  )).report.id
+
+  const admin = await browser.newContext({ baseURL: ORIGIN })
+  try {
+    await devLogin(admin.request, ADMIN_EMAIL)
+    const removal = await json<{ generations: number; blocked: boolean }>(
+      post(admin.request, `/api/admin/takedowns/${reportId}/resolve`, {
+        action: 'remove', generationId: reported, memberUploadId: bId,
+        note: 'Confirmed second member reported their image',
+      }),
+    )
+    expect(removal).toMatchObject({ generations: 2, blocked: true })
+    const audit = await json<{ entries: Array<{ target_id: string; detail: string }> }>(
+      admin.request.get('/api/admin/audit'),
+    )
+    expect(JSON.parse(audit.entries.find((entry) => entry.target_id === reportId)!.detail))
+      .toMatchObject({ memberUploadId: bId })
+  } finally {
+    await admin.close()
+  }
+
+  for (const id of [reported, sharedBand]) {
+    expect((await json<{ error: string }>(request.get(`/api/generations/${id}/video`), 410)).error).toBe('media_removed')
+  }
+  expect((await request.get(`/api/generations/${kept}/video`)).status()).toBe(200)
+  expect((await json<{ error: string }>(uploadPhoto(request, b), 422)).error).toBe('content_rejected')
+  await upload(request, a)
+  await upload(request, c)
+})
+
 test('上传审核不通过返回 422，不落盘；之后正常图片仍可上传', async ({ request }) => {
   await devLogin(request, uniqueEmail('moderation'))
   const rejected = await request.post('/api/uploads', {

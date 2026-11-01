@@ -10,6 +10,28 @@ https://github.com/user-attachments/assets/ce92074a-2a09-4a3e-b750-4b888d12abf8
 
 A 72-second tour, no sound ([Chinese version](README.zh-CN.md); MP4 files in [docs/media](docs/media)). Screens are from a local run; the demo site "Neon Shuffle AI" and its clips are placeholders.
 
+Preview videos play muted by default; use each video's controls to turn sound on or off and enter fullscreen where supported.
+
+Public site settings are managed in `site.setup.json` and written to `wrangler.jsonc` by `npm run setup -- --apply`. Setup can create a missing Cloudflare zone and show its nameservers; review and migrate DNS records before changing the registrar settings. Run database migrations next, then deploy; these commands use the Cloudflare token in `.dev.vars.platform` when no token is set in the environment. The deployment check does not overwrite Wrangler settings from the runtime secrets file.
+
+Setup configures a permanent www-to-apex redirect using Cloudflare redirect rules, retaining the path, query string and request method. The Cloudflare token needs DNS and redirect-rule permissions.
+
+Set `GA4_MEASUREMENT_ID=G-...` in `.dev.vars.production` to enable GA4 on the next deployment. This public ID is copied to the site configuration before the build and is not uploaded as a Worker secret; an empty value disables GA4.
+
+The launch commands are `npm run setup -- --apply`, `npm run db:migrate:remote`, and `npm run deploy`, in that order. Deployment runs doctor, typecheck, unit tests and build before publishing. Back up existing production data before migrations; configure and verify external DNS, payment webhooks, reference media and email delivery separately.
+
+邮件收件转发可在 `site.setup.json` 的 `email.routing` 中启用并设置 `destination`；来源默认为 `site.adminEmail`，也可设置 `source`。目标邮箱首次验证后，重新运行 `npm run setup -- --apply` 完成转发配置。Cloudflare Token 需要邮件路由地址、规则和 Zone 设置的读写权限；已有其他服务商的 MX 或冲突规则时会停止。配置完成后需实际验证收件。
+
+人像上传时，浏览器会将长边超过 2560 像素的照片等比缩小并压缩为 JPEG；网站接收原图核对下架指纹，审核并保存处理后的照片。原文件大小上限仍为 10 MB，单人和多人模式均适用。
+
+生成期间展示排队或生成状态、已等待时间和“我的视频”入口；多人上传时显示照片进度。离开页面后可从个人中心查看任务结果。
+
+真实支付测试可在 `site.setup.json` 的 `payment` 中设置 `testPackageEnabled: true` 与 `createProducts: true`，执行 `npm run setup -- --apply` 和 `npm run deploy`，再从管理员后台运营设置发起 $0.01 / 100 积分的真实 Waffo 支付。测试后将开关改为 `false` 并重跑两条命令可关闭新下单；Waffo 商品需在后台另行停用。保留商品映射和订单以处理延迟回调。
+
+后台支付连接测试检查在售套餐，订阅关闭时仍检查已有订阅或历史订单涉及的订阅套餐；从未出售的订阅套餐不会被误报为缺失。
+
+Setup saves newly created Resend sending keys immediately. If an existing key cannot be recovered locally, setup creates a replacement without deleting the old key; existing Worker secrets are not overwritten.
+
 ## Built with ShrimpReel
 
 <a href="https://christmasdanceai.com/?utm_source=github&utm_medium=referral&utm_campaign=shrimpreel"><img src="docs/media/showcase-christmas-dance-ai.jpg" width="600" alt="Christmas Dance AI: one photo turned into an elf dance or a Christmas party dance video"></a>
@@ -36,6 +58,30 @@ A 72-second tour, no sound ([Chinese version](README.zh-CN.md); MP4 files in [do
   - Content and SEO: one-page home (How it works / What is, plus optional problem and "doing it yourself vs. this site" blocks), an extensible article collection (`/guides` hub, related articles), legal pages, contact form; SSR canonical, hreflang, JSON-LD and sitemap; copy is code-split per locale; `npm run seo:check` lints the whole site.
 
 Release notes: [CHANGELOG.md](CHANGELOG.md). Feature notes and plans: [docs/SAAS_VIDEO_FEATURES.md](docs/SAAS_VIDEO_FEATURES.md) and [ROADMAP.md](ROADMAP.md). SEO rules, keyword planning and audit results: [docs/SEO_AUDIT.md](docs/SEO_AUDIT.md). All environment variables and the launch-related `site.ts` fields: [docs/env.md](docs/env.md). Adding a payment provider and the webhook response-code contract: [docs/payments.md](docs/payments.md). The subscription switch, plans and provider setup: [docs/subscriptions.md](docs/subscriptions.md). Conventions to follow before changing code (credits, payment fulfillment, bilingual copy, migrations, e2e): [AGENTS.md](AGENTS.md). The docs/ files and AGENTS.md are in Chinese.
+
+## Google and email sign-in
+
+Google sign-in remains unchanged. Set `email.loginEnabled` in `site.setup.json` to enable optional email OTP sign-in after migration `0016_email_login.sql`, Turnstile and real email delivery have been verified. Legacy Google users must opt in from Settings using their existing session; an OTP alone never links an old Google account. See [environment setup](docs/env.md).
+
+## Fast Cloudflare setup for a new site
+
+After running `scripts/new-site.mjs` for new keywords and replacing the site-specific media/copy, use `scripts/bootstrap-site.mjs` to provision D1, R2, KV and Queues safely. Copy `site.setup.example.json` to gitignored `site.setup.json` and fill the public settings; put secrets only in `.dev.vars.production`.
+
+```powershell
+npm run setup -- --plan
+npm run setup -- --apply
+npm run setup -- --verify
+```
+
+No automatic deployment or secret overwrites. With platforms enabled in site.setup.json, `npm run setup -- --apply` also runs V2 platform provisioning. See [V1 bootstrap guide](docs/bootstrap-site.md) and [V2 guide](docs/bootstrap-v2.md).
+
+## Demo media
+
+The homepage MP4 previews in `public/demo/` were replaced by the site owner with real AI-generated demos. `src/config/demo-media.ts` reflects the current labels. The existing file paths are retained so previous video assets do not need to be renamed. Do not overwrite these demos by running the original stock downloader.
+
+The 14-second R2 motion-reference video (`templates/tiny-desk-v1-reference-14s.mp4`) is a **separate** input. Historical Pexels credits in `docs/media/` concern the old source/reference materials, not the new public demos. Verify the R2 reference video, its rights and the real Kie outputs separately.
+
+The optional photo-to-result pair in `site.styles[].examples.madeWith` is intentionally hidden until a correctly matched, authorized original portrait is provided. Do not invent an input photo to show before/after results.
 
 ## Local development
 
@@ -86,10 +132,10 @@ With Claude Code, once the site repo exists (step 1) you can just say "new hot s
    - Copy is code-split per locale, so the browser only downloads the current language (legal pages included). Components call `getContent(locale)` as usual; only code that needs copy outside the root route and before rendering has to `await loadContent(locale)` first.
    - Adding a locale: register it in `LOCALES` and `LOCALE_META` in `site.ts`, create `src/content/<locale>.ts` (same type as `en.ts`), and add a dynamic import to `loaders` in `src/lib/i18n.ts`. Email templates are typed per locale as well, so typecheck lists what else needs translating.
 4. **Replace the media**
-   - `seed/templates/<style id>-<seconds>s.mp4`: source videos for generation, one per duration for every style (`site.styles[].sources`); upload them to `templates/` in R2 after deploying.
-   - `public/demo/*`: home page demo videos and posters. They must be your own or licensed, with the source credited in `site.styles[].examples.*.credit`.
+   - `seed/templates/<style id>-<seconds>s.mp4`: duration-matched source videos for fal / yir / NanoAPI; Kie additionally uses `site.styles[].sources.reference` (fixed 14 seconds). Upload all configured source files to `templates/` in R2 after deploying.
+   - `public/demo/*`: home page demo videos and posters. They must be your own or licensed, with the source credited in `site.styles[].examples.previews[].credit`.
    - `public/og.png`, `public/favicon.svg`.
-   - **Multiple dance styles** (optional): add more entries to `site.styles`. Each has an `id` (written to `generations.template_id`, don't change it once published), `sources` (one file per `durations[].id`), `prompt` (`null` = `video.yir.prompt` / `video.nanoapi.prompt`), `scene` (yir two-step `{ frame, prompt }`, `null` = single step) and `examples` (`original`, `aiVersions`, `madeWith`). The first style is the default. Add `styles['<id>'] = { name, tagline }` to `en.ts` and `zh.ts`. With one style the UI shows no style picker; with several, the generator gets a picker (`/?style=<id>` preselects), the home hero gets style tabs and "Made with" shows one row per style.
+   - **Multiple dance styles** (optional): add more entries to `site.styles`. Each has an `id` (written to `generations.template_id`, don't change it once published), `sources` (one file per `durations[].id` plus the fixed Kie `reference` file), `prompt` (`null` = `video.yir.prompt` / `video.nanoapi.prompt`), `scene` (yir two-step `{ frame, prompt }`, `null` = single step) and `examples` (`previews`, `madeWith`). The first style is the default. Add `styles['<id>'] = { name, tagline }` to `en.ts` and `zh.ts`. With one style the UI shows no style picker; with several, the generator gets a picker (`/?style=<id>` preselects), the home hero gets style tabs and "Made with" shows one row per style.
    - `node scripts/generate-placeholder-media.mjs` (requires ffmpeg) regenerates original placeholder media, named after `site.styles[].sources` and the brand. Delete the old style's files from `seed/templates/` afterwards.
 5. **Set `vars` in `wrangler.jsonc`**: `SITE_URL`, `APP_ENV=production`, `PAYMENT_PROVIDER`, `VIDEO_PROVIDER`, `MODERATION_PROVIDER`, `TURNSTILE_SITE_KEY`, `ADMIN_EMAILS`, `EMAIL_FROM`, `*_PRODUCTS`, `GOOGLE_CLIENT_ID`; write the D1/KV ids back after creating the resources (see below).
 6. **Create products with your payment provider**: one one-time product per credit pack and one subscription product per plan, with the product ids in `WAFFO_PRODUCTS`, `DODO_PRODUCTS` or `STRIPE_PRODUCTS` (Stripe takes Price ids, `price_...`), e.g. `{"starter":"prod_xxx","party":"prod_yyy","squad":"prod_zzz","monthly":"prod_aaa","yearly":"prod_bbb"}`. Waffo subscriptions also need `WAFFO_STORE_ID` for the customer portal; with the subscription switch off, the setup scripts skip plan products. For Waffo, `node scripts/waffo-setup.mjs --store STO_xxx --apply` creates them in bulk; for Dodo, `node scripts/dodo-setup.mjs --apply --write-dev-vars` (add `--webhook <url>` to also create the webhook and write its signing secret to `.dev.vars`; when several sites share one Dodo business, add `--brand <brand_id>` so the products belong to this site's brand and checkout shows its name and logo); for Stripe, `node scripts/stripe-setup.mjs --apply --write-dev-vars` with the same `--webhook` option. Prices on the site are display-only; the provider's dashboard is what actually gets charged, so keep them in sync.
@@ -137,7 +183,7 @@ npx wrangler r2 object put <name>-media/templates/<file>.mp4 --file seed/templat
 ```
 
 - `ratelimits[].namespace_id` must be unique within an account; don't share the same numbers across sites.
-- Secrets: `SESSION_SECRET`, `GOOGLE_CLIENT_SECRET`, `WAFFO_MERCHANT_ID`, `WAFFO_PRIVATE_KEY`, `DODO_API_KEY`, `DODO_WEBHOOK_SECRET`, `FAL_KEY`; with Stripe, `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`; optionally `YIR_API_KEY` (`VIDEO_PROVIDER=yir`), `NANOAPI_API_KEY` (`VIDEO_PROVIDER=nanoapi`), `OPENAI_API_KEY` (image moderation) and `TURNSTILE_SECRET_KEY`. Set them one by one with `npx wrangler secret put <NAME>`, or sync them in one go with `scripts/sync-secrets.mjs`:
+- Secrets: `SESSION_SECRET`, `GOOGLE_CLIENT_SECRET`, `WAFFO_MERCHANT_ID`, `WAFFO_PRIVATE_KEY`, `DODO_API_KEY`, `DODO_WEBHOOK_SECRET`, `FAL_KEY`, `KIE_API_KEY` (`VIDEO_PROVIDER=kie`); with Stripe, `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`; optionally `YIR_API_KEY` (`VIDEO_PROVIDER=yir`), `NANOAPI_API_KEY` (`VIDEO_PROVIDER=nanoapi`), `OPENAI_API_KEY` (image moderation) and `TURNSTILE_SECRET_KEY`. Set them one by one with `npx wrangler secret put <NAME>`, or sync them in one go with `scripts/sync-secrets.mjs`:
   ```bash
   cp .dev.vars.example .dev.vars.production     # fill in production values; .dev.vars.* is gitignored
   node scripts/sync-secrets.mjs                 # plan only: new, existing, remote-only, still missing; never prints values
@@ -262,11 +308,11 @@ SMOKE_BASE_URL=https://video-template-staging.<subdomain>.workers.dev SMOKE_EXPE
   - A refund that arrives before its payment (the paid webhook is still being retried) is recorded as failed and returns 5xx so the provider retries it after the payment is credited.
   - If a webhook is lost or late, the site asks the provider directly (`src/server/reconcile.ts`; Dodo: checkout session → payment, Stripe: checkout session with its line items and invoice, Waffo: GraphQL `payments` by merchant order id). The success page asks once at about 15 s and once at about 60 s; the 5-minute Cron checks pending orders between 10 minutes and 24 hours old with exponential backoff (about 10, 20, 40… minutes, at most 10 orders per run); the admin order page has a "查单" (check with provider) action to use before mark-paid. A payment found this way goes through the same checks and idempotency keys as the webhook, so a late webhook isn't credited again. The browser can only send the order id, never a payment status. Orders that already have a `mismatch` event are left for manual review.
 - **Generation**: credits are deducted before enqueueing and returned automatically on failure, timeout or when an admin fails the job. The video provider webhook and the poller may handle the same job concurrently; only one of them can mark it succeeded, and the other never deletes the stored video.
-- **Cost and margin**: when a video is produced, the provider cost is stored in `generations.provider_cost_cents`: the actual charge when the yir or NanoAPI bill is already settled, otherwise an estimate from the prices in `site.video`.
-  - fal bills per frame: 16 frames count as one video second, $0.04 per video second at 480p ([pricing](https://fal.ai/models/fal-ai/wan/v2.2-14b/animate/replace)). The template source videos are 24fps, so a video costs 6¢ per second, about $1.08 for 18 seconds. Update `costCentsPerVideoSecond` and `sourceFps` when changing the model, resolution or source frame rate.
+- **Cost and margin**: when a video is produced, the provider cost is stored in `generations.provider_cost_cents`: the settled charge when yir or NanoAPI returns it, Kie.ai's `creditsConsumed` converted at the configured USD-per-credit rate, otherwise an estimate from `site.video`.
+  - fal bills per frame: 16 frames count as one video second, $0.04 per video second at 480p ([pricing](https://fal.ai/models/fal-ai/wan/v2.2-14b/animate/replace)). The template source videos are 24fps, so a video costs 6¢ per second, about $0.90 for 15 seconds. Update `costCentsPerVideoSecond` and `sourceFps` when changing the model, resolution or source frame rate.
   - Jobs failed after a video was produced (timeout, failed by an admin) still record the cost; failures without a video don't. mock records 0.
-  - The admin overview shows the last 30 days of provider cost, revenue from credits consumed and estimated gross margin; the generations list shows cost and margin per job. Revenue per credit = net revenue of paid USD orders ÷ credits not clawed back. The provider's invoice is the source of truth.
-- **Video providers**: `VIDEO_PROVIDER` picks `fal` (default), `yir`, `nanoapi` or `mock`. [yir.ai](https://yir.ai/?ref=qianshuixia) is an image and video API router. To use it, set `VIDEO_PROVIDER=yir` and the `YIR_API_KEY` secret, and adjust the model and prompt in `site.video.yir` (`src/server/video/yir.ts`).
+  - The admin overview shows the last 30 days of provider cost, revenue from credits consumed and estimated gross margin; the generations list shows cost and margin per job. Revenue per credit = net revenue of paid USD orders ÷ credits not clawed back. The provider's invoice is the source of truth. Kie.ai credit conversion is based on its current model-page price and may change; re-check the pricing page before changing resolution or launching.
+- **Video providers**: `VIDEO_PROVIDER` picks `fal` (default), `yir`, `nanoapi`, `kie` or `mock`. [yir.ai](https://yir.ai/?ref=qianshuixia) is an image and video API router. To use it, set `VIDEO_PROVIDER=yir` and the `YIR_API_KEY` secret, and adjust the model and prompt in `site.video.yir` (`src/server/video/yir.ts`).
   - yir has no character-replacement model like the one the template uses (`wan/v2.2-14b/animate/replace`). The integration uses Kling 2.6 Motion Control (reference mode: the photo plus the template's source video). The template ships the integration code only and it hasn't been tested with a real key (submit, status and error mapping are covered by unit tests), so verify output quality and price yourself; `costCentsPerSecond: 7` is an estimate, so update it from the [yir model page](https://yir.ai/models) before launch.
   - Two-step mode (optional, per style: `site.styles[].scene = { frame, prompt }`, `null` by default; shared image-model settings in `site.video.yir.sceneImage`): Motion Control takes the background from the user's photo. To keep the source video's scene, an image model (such as `google/nano-banana-2`) first puts the person from the photo into the source video's first frame, and the composite becomes the motion reference. Put the frame in `seed/templates/` and upload it to `templates/` in R2 like the source videos (`--content-type image/jpeg`). The composite is uploaded to the yir Files API and the second step references it by a fixed `file_id`, so a resubmit sends the same body. Each order pays for one extra image (`sceneImage.costCents`), and the user's photo also goes through the image model's channels.
   - Jobs are submitted with the generation id as `Idempotency-Key`, so a resubmit after a queue redelivery or an interrupted Worker gets the same yir job back and isn't billed twice. yir matches requests by body, so the signed photo URL is derived from the job's creation time (valid for 2 hours) and stays the same on resubmit.
@@ -279,6 +325,7 @@ SMOKE_BASE_URL=https://video-template-staging.<subdomain>.workers.dev SMOKE_EXPE
   - NanoAPI downloads the photo and the source video itself, with a browser User-Agent, and reads the video with Range requests. A source it can't read fails the task with `internal_error` (refunded), not `invalid_media`; in testing that happened with a server without Range support and with a signed URL that had no file extension. The template's `/media/*` routes support Range and end in `.mp4`. Don't put a bot challenge (Bot Fight Mode, Under Attack mode, a WAF challenge) in front of `/media/*`. For local tests, Pinggy's free tunnel shows browsers an interstitial page, so use another tunnel.
   - NanoAPI has no idempotency key, so a resubmit after a queue redelivery or an interrupted Worker would be billed twice. Before creating a task the provider lists the last 3 hours of tasks and reuses the one whose photo URL and source video URL match (the signed photo URL is derived from the job's creation time, so it is the same for one job and different for every other). If the list request fails, the submit fails (and is retried when the error is retryable) instead of creating blindly.
   - A missing or revoked key, an empty balance or a suspended account fails the job with a refund and fires the "Video provider account" alert right away. There is no monthly limit on the key; watch the balance in the NanoAPI console. Results are polled every 30 seconds (the docs ask for at least 15).
+  - **Kie.ai Seedance 2.0 Mini** (`VIDEO_PROVIDER=kie`, secret `KIE_API_KEY`, config in `site.video.kie`, implementation in `src/server/video/kie.ts`) uses multimodal reference-to-video: the user uploads one portrait, while a fixed 14-second licensed performance clip is served from R2 as the video reference. fal / yir / NanoAPI continue to use duration-matched source clips. The request uses `reference_image_urls` + `reference_video_urls`; never combine these with `first_frame_url` or `last_frame_url`. It outputs 720p, 9:16, with native audio enabled. At the current documented 720p-with-video price (5 credits per combined input/output second; $0.005 per credit), a fixed 14-second reference input plus the selected output duration estimates to $0.50 / $0.65 / $0.73 for 6 / 12 / 15-second outputs. The completed task's `creditsConsumed` is used for actual cost when present. Kie returns credits (not USD) from its balance endpoint; monitoring converts them to USD using `site.video.kie.usdPerCredit`. Kie-generated result URLs are temporary (14 days), so the Worker copies completed MP4s into R2. Kie documentation does not describe an idempotency key. The signed callback persists its `data.taskId` as a recovery path if the create-task response is lost. Ambiguous create responses are deliberately not resubmitted: the job waits for the callback and otherwise reaches the normal 45-minute timeout/refund, avoiding a blind second billable task. Verify this callback recovery with a real key before opening production traffic. Reference clips must be MP4/MOV, 2–15 seconds, no more than 50 MB, 24–60 fps, and within Kie’s documented reference-video dimensions/pixel limits.
 - **Security**: non-GET `/api/*` requests (except webhooks, CSP reports and browser error reports) must have an `Origin` matching the site; uploads are type-checked by magic bytes; uploads and generation are rate-limited per user; banning a user invalidates their sessions immediately; admin actions are written to `admin_audit`.
   - The `redirect` after sign-in (sign-in page and Google callback) only accepts same-site paths: `src/lib/redirect.ts` rejects backslashes, control characters and anything that normalizes to a leading `//`, so links like `/sign-in?redirect=/\evil.com` land on the dashboard.
   - For 5xx errors only admins get the `message`; everyone else gets just the error code, and the details go to Workers Logs as `[api] <method> <path> <code>: <message>`.
@@ -428,6 +475,8 @@ e2e coverage (70 tests):
 Artifacts go to `.tmp/video-template-e2e/`: `report/` (HTML report with screenshots and traces for every step), `results.json` and `test-results/`.
 
 ## Project layout
+
+The new-site script creates missing setup and local production-secret files, generates a session secret, and clears old site-specific payment and Turnstile settings when the site identity changes. Set the public video provider, moderation provider and sender in `site.setup.json`; setup writes them to `wrangler.jsonc`, while platform credentials and runtime secrets stay in their separate files. Setup can discover Cloudflare account and zone IDs from an existing zone. Offline plans make no network calls. See [bootstrap-site.md](docs/bootstrap-site.md) and [bootstrap-v2.md](docs/bootstrap-v2.md).
 
 ```text
 src/config/site.ts      per-site config

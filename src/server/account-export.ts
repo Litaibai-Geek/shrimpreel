@@ -8,7 +8,7 @@ import { nowIso } from './util'
 // 媒体文件本身不打包，保留期内可在个人中心逐个下载。
 const QUERIES = {
   account: `SELECT id, email, name, avatar_url AS avatarUrl, status, credits, locale, country, created_at AS createdAt,
-      last_login_at AS lastLoginAt, signup_source AS signupSource, signup_medium AS signupMedium,
+      last_login_at AS lastLoginAt, email_login_enabled AS emailLoginEnabled, signup_source AS signupSource, signup_medium AS signupMedium,
       signup_campaign AS signupCampaign, signup_device AS signupDevice, attribution, referral_code AS referralCode
     FROM users WHERE id = ?1`,
   sessions: `SELECT created_at AS createdAt, expires_at AS expiresAt, user_agent AS userAgent, ip
@@ -33,7 +33,9 @@ const QUERIES = {
   uploads: `SELECT id, content_type AS contentType, size_bytes AS sizeBytes, sha256, created_at AS createdAt, expired_at AS expiredAt
     FROM uploads WHERE user_id = ?1 ORDER BY created_at`,
   generations: `SELECT id, template_id AS templateId, duration_id AS durationId, duration_seconds AS durationSeconds,
-      credits_cost AS creditsCost, upload_id AS uploadId, status, error_code AS errorCode, refunded,
+      credits_cost AS creditsCost, upload_id AS uploadId,
+      CASE WHEN json_valid(provider_meta) THEN json_extract(provider_meta, '$.band.uploadIds') ELSE NULL END AS bandUploadIds,
+      status, error_code AS errorCode, refunded,
       created_at AS createdAt, completed_at AS completedAt, expired_at AS expiredAt, removed_at AS removedAt,
       share_id AS shareId, shared_at AS sharedAt
     FROM generations WHERE user_id = ?1 ORDER BY created_at`,
@@ -51,12 +53,13 @@ type Row = Record<string, unknown>
 
 // attribution 列存的是 JSON 字符串，导出时展开；解析失败就保留原文
 function expandJson(row: Row) {
-  if (typeof row.attribution !== 'string') return row
-  try {
-    return { ...row, attribution: JSON.parse(row.attribution) as unknown }
-  } catch {
-    return row
+  const result = { ...row }
+  for (const key of ['attribution', 'bandUploadIds'] as const) {
+    if (typeof result[key] !== 'string') continue
+    try { result[key] = JSON.parse(result[key] as string) as unknown }
+    catch { /* Keep legacy invalid JSON as original text. */ }
   }
+  return result
 }
 
 export async function exportUserData(env: Env, userId: string) {

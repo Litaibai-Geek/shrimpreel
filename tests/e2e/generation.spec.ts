@@ -145,9 +145,14 @@ test.describe('多风格站点', () => {
     await page.getByTestId(`hero-tab-${second.id}`).click()
     await expect(page.getByTestId(`hero-tab-${second.id}`)).toHaveAttribute('aria-selected', 'true')
     await expect(page.getByTestId(`style-${second.id}`)).toHaveAttribute('aria-checked', 'true')
-    await expect(page.locator(`[role="tabpanel"] video[src="${second.examples.original.video}"]`)).toHaveCount(1)
-    // “Made with”每个风格各一行，不依赖 JS
-    for (const style of STYLES) await expect(page.getByTestId(`made-with-${style.id}`)).toBeVisible()
+    const previews = second.examples.previews.filter((clip) => clip.video && clip.poster)
+    await expect(page.locator('[role="tabpanel"] video')).toHaveCount(previews.length)
+    for (const [index, clip] of previews.entries()) await expect(page.locator('[role="tabpanel"] video').nth(index)).toHaveAttribute('src', clip.video)
+    // 只有素材完整的风格才显示“Made with”案例
+    for (const style of STYLES) {
+      const example = style.examples.madeWith
+      await expect(page.getByTestId(`made-with-${style.id}`)).toHaveCount(example.photo && example.video && example.poster ? 1 : 0)
+    }
 
     // 键盘：方向键在标签间移动并选中
     await page.getByTestId(`hero-tab-${second.id}`).focus()

@@ -50,7 +50,8 @@ const stripePrice = (override: Record<string, Record<string, unknown>> = {}) => 
   }
 }
 
-const probe = (target: Parameters<typeof runProbe>[1], env: Record<string, unknown>) => runProbe({ KV: { get: async () => ({}) }, ...env } as unknown as Env, target, admin)
+const historicalDb = (ids: string[]) => ({ prepare: () => ({ bind: () => ({ all: async () => ({ results: ids.map((plan_id) => ({ plan_id })) }) }) }) })
+const probe = (target: Parameters<typeof runProbe>[1], env: Record<string, unknown>) => runProbe({ KV: { get: async () => ({}) }, DB: historicalDb(site.plans.map((plan) => plan.id)), ...env } as unknown as Env, target, admin)
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -58,6 +59,16 @@ afterEach(() => {
 
 describe('支付探测', () => {
   const dodo = { PAYMENT_PROVIDER: 'dodo', DODO_API_KEY: DODO_KEY, DODO_PRODUCTS }
+
+  it('未售出订阅且关闭订阅时只检查积分包；有历史订阅或订单时仍检查相关套餐', async () => {
+    if (site.subscriptionsEnabled) return
+    const packagesOnly = JSON.stringify(Object.fromEntries(site.packages.map((pack) => [pack.id, `pdt_${pack.id}`])))
+    stubFetch({ '/products/': dodoPrice({}) })
+    expect(await probe('payment', { ...dodo, DODO_PRODUCTS: packagesOnly, DB: historicalDb([]) })).toMatchObject({ status: 'ok' })
+    const historic = await probe('payment', { ...dodo, DODO_PRODUCTS: packagesOnly, DB: historicalDb([site.plans[0]!.id]) })
+    expect(historic.status).toBe('fail')
+    expect(historic.message).toContain(site.plans[0]!.id)
+  })
 
   it('Dodo：每个套餐的商品和价格一致时 ok，只读 GET 商品接口，走 test 环境', async () => {
     const calls = stubFetch({ '/products/': dodoPrice({}) })
@@ -178,6 +189,24 @@ describe('视频服务商探测', () => {
     stubFetch({ 'api.nanoapi.ai': { status: 401 } })
     expect(await probe('video', env)).toMatchObject({ status: 'fail', message: 'NANOAPI_API_KEY 无效' })
     expect(await probe('video', { VIDEO_PROVIDER: 'nanoapi' })).toMatchObject({ status: 'fail', message: 'NANOAPI_API_KEY 未配置' })
+  })
+
+  it('Kie.ai：余额接口返回 credits，按 $0.005 / credit 换算美元并沿用 $10 低余额阈值', async () => {
+    const env = { VIDEO_PROVIDER: 'kie', KIE_API_KEY: 'kie_key_abcdefgh' }
+    const calls = stubFetch({ 'api.kie.ai/api/v1/chat/credit': { body: { code: 200, msg: 'success', data: 2500 } } })
+    expect(await probe('video', env)).toMatchObject({
+      status: 'ok',
+      provider: 'kie',
+      message: '鉴权正常，余额 2500.00 credits (~$12.50)',
+    })
+    expect(calls[0]?.url).toBe('https://api.kie.ai/api/v1/chat/credit')
+    expect(calls[0]?.auth).toBe('Bearer kie_key_abcdefgh')
+
+    stubFetch({ 'api.kie.ai/api/v1/chat/credit': { body: { code: 200, data: 1000 } } })
+    expect(await probe('video', env)).toMatchObject({ status: 'warn', message: '鉴权正常，但 Kie.ai 余额只剩 1000.00 credits (~$5.00)，请尽快充值' })
+    stubFetch({ 'api.kie.ai/api/v1/chat/credit': { body: { code: 401, msg: 'invalid key' } } })
+    expect(await probe('video', env)).toMatchObject({ status: 'fail', message: 'KIE_API_KEY 无效' })
+    expect(await probe('video', { VIDEO_PROVIDER: 'kie' })).toMatchObject({ status: 'fail', message: 'KIE_API_KEY 未配置' })
   })
 
   it('上游报错里出现的密钥值被替换掉', async () => {

@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
-import { ArrowRight, Camera, Check, Clock, Coins, Film, Flame, ShieldCheck, Smartphone, Sparkles, X } from 'lucide-react'
+import { ArrowRight, Camera, Check, Clock, Coins, Film, Flame, ShieldCheck, Smartphone, X } from 'lucide-react'
 import { Faq, faqJsonLd } from '#/components/Faq'
 import { Generator } from '#/components/Generator'
 import { Pricing } from '#/components/Pricing'
@@ -34,27 +34,39 @@ const FEATURE_ICONS = [Camera, Film, Smartphone, Clock, ShieldCheck, Coins]
 
 function Home() {
   const c = useContent()
-  const ex = site.examples
   const search = Route.useSearch()
   // hero 标签和生成器共用同一个风格；SSR 默认显示默认风格（或 URL 指定的）
   const [styleId, setStyleId] = useState<string>(search.style ?? defaultStyle.id)
   const style = findStyle(styleId) ?? defaultStyle
+  const heroClips = style.examples.previews.filter((clip) => clip.video && clip.poster)
+  const hasMadeWithExamples = STYLES.some((item) => item.examples.madeWith.photo && item.examples.madeWith.video && item.examples.madeWith.poster)
   const styleCopy = (id: string) => c.styles[id as keyof typeof c.styles]
   return (
     <>
-      {/* Hero：左侧生成器，右侧原版 vs AI 版对比 */}
+      {/* Hero：左侧生成器，右侧展示站长提供的真实 AI 生成视频 */}
       <section className="relative overflow-hidden">
         <div className="hero-glow pointer-events-none absolute inset-0" aria-hidden />
-        <div className="container-page relative grid gap-10 py-10 lg:grid-cols-[minmax(0,430px)_1fr] lg:gap-16 lg:py-14">
-          <div className="space-y-5" id="create">
+        <div className="container-page relative space-y-8 py-10 lg:py-14">
+          {/* 居中标题 */}
+          <div className="text-center">
             <h1 className="font-display text-5xl leading-[1.04] tracking-tight sm:text-6xl">{c.hero.title}</h1>
-            <p className="text-lg leading-8 text-muted">{c.hero.subtitle}</p>
-            <Generator styleId={style.id} onStyleChange={setStyleId} />
+            <p className="mx-auto mt-4 max-w-2xl text-lg leading-8 text-muted">{c.hero.subtitle}</p>
           </div>
-          <div className="flex flex-col justify-center gap-5">
+
+          {/* 生成器和预览 */}
+          <div className="grid gap-y-5 lg:grid-cols-[minmax(0,430px)_minmax(0,1fr)] lg:gap-x-16 lg:gap-y-5">
+          {/* Desktop: a shared grid row keeps the generator and videos aligned in Solo and Band modes.
+              Mobile order retains heading → generator → badge → previews. */}
+          <div className="order-1 space-y-5">
             <span className="chip w-fit">
               <Flame className="size-4 text-accent" /> {c.hero.badge}
             </span>
+          </div>
+          <div className="order-2 min-w-0 lg:order-3" id="create">
+            <Generator styleId={style.id} onStyleChange={setStyleId} />
+          </div>
+          <div className="order-3 lg:order-2" />
+          <div className="order-4 flex min-w-0 flex-col gap-5">
             {STYLES.length > 1 ? (
               <div role="tablist" aria-label={c.generator.stepStyle} className="flex flex-wrap gap-2">
                 {STYLES.map((s) => {
@@ -91,20 +103,28 @@ function Home() {
               className="grid grid-cols-3 gap-3 sm:gap-4"
               {...(STYLES.length > 1 ? { id: 'hero-panel', role: 'tabpanel', 'aria-labelledby': `hero-tab-${style.id}` } : {})}
             >
-              <VideoCard key={`${style.id}-original`} video={style.examples.original.video} poster={style.examples.original.poster} label={c.hero.original} credit={style.examples.original.credit} />
-              {style.examples.aiVersions.map((v) => (
-                <VideoCard
-                  key={v.video}
-                  video={v.video}
-                  poster={v.poster}
-                  credit={v.credit}
-                  label={
-                    <>
-                      <Sparkles className="size-3" /> {c.hero.aiVersion}
-                    </>
-                  }
-                />
-              ))}
+              {heroClips.length ? (
+                heroClips.map((clip, index) => (
+                  <VideoCard
+                    key={`${style.id}-example-${index}`}
+                    video={clip.video}
+                    poster={clip.poster}
+                    credit={clip.credit}
+                    label={clip.label}
+                  />
+                ))
+              ) : (
+                [c.hero.original, c.hero.aiVersion, c.hero.aiVersion].map((label, index) => (
+                  <figure key={`empty-example-${index}`}>
+                    <div className="relative aspect-[9/16] overflow-hidden rounded-2xl bg-bg-soft ring-1 ring-line">
+                      <div className="absolute inset-0 grid place-items-center">
+                        <Film className="size-7 text-muted/60" aria-hidden />
+                      </div>
+                    </div>
+                    <figcaption className="mt-2 truncate text-center text-xs text-muted">{label}</figcaption>
+                  </figure>
+                ))
+              )}
             </div>
             <div className="flex flex-wrap justify-center gap-2">
               {c.hero.chips.map((chip) => (
@@ -122,6 +142,7 @@ function Home() {
                 {c.articles.howTo.title} <ArrowRight className="size-4" />
               </LocalLink>
             </div>
+          </div>
           </div>
         </div>
       </section>
@@ -207,40 +228,41 @@ function Home() {
         </div>
       </section>
 
-      {/* Made with：照片 → 成片 */}
-      <section id="examples" className="scroll-mt-20 border-t border-line bg-bg-soft/60 py-20">
-        <div className="container-page grid items-center gap-12 lg:grid-cols-[1fr_1.1fr]">
-          <div className="space-y-4">
-            <p className="eyebrow text-accent-text">{c.madeWith.eyebrow}</p>
-            <h2 className="font-display text-4xl leading-tight sm:text-5xl">{c.madeWith.title}</h2>
-            <p className="max-w-md text-lg leading-8 text-muted">{c.madeWith.body}</p>
-          </div>
-          {/* 每种风格各一行（服务端渲染，不依赖 JS）；单风格时不显示风格名 */}
-          <div className="space-y-10">
-            {STYLES.map((s) => (
-              <div key={s.id} className="space-y-3" data-testid={`made-with-${s.id}`}>
-                {STYLES.length > 1 ? (
-                  <p className="text-sm">
-                    <span className="font-semibold">{styleCopy(s.id).name}</span>
-                    <span className="text-muted"> · {styleCopy(s.id).tagline}</span>
-                  </p>
-                ) : null}
-                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-                  <figure>
-                    <img src={s.examples.madeWith.photo} alt={c.alt.inputPhoto} loading="lazy" className="aspect-[3/4] w-full rounded-2xl object-cover ring-1 ring-line" />
-                    <figcaption className="mt-2 text-center text-xs text-muted">{c.madeWith.photoLabel}</figcaption>
-                  </figure>
-                  <ArrowRight className="size-6 text-muted" aria-hidden />
-                  <div>
-                    <VideoCard video={s.examples.madeWith.video} poster={s.examples.madeWith.poster} />
-                    <p className="mt-2 text-center text-xs text-muted">{c.madeWith.resultLabel}</p>
+      {/* Made with：有真实示例素材后再显示照片 → 成片区块 */}
+      {hasMadeWithExamples ? (
+        <section id="examples" className="scroll-mt-20 border-t border-line bg-bg-soft/60 py-20">
+          <div className="container-page grid items-center gap-12 lg:grid-cols-[1fr_1.1fr]">
+            <div className="space-y-4">
+              <p className="eyebrow text-accent-text">{c.madeWith.eyebrow}</p>
+              <h2 className="font-display text-4xl leading-tight sm:text-5xl">{c.madeWith.title}</h2>
+              <p className="max-w-md text-lg leading-8 text-muted">{c.madeWith.body}</p>
+            </div>
+            <div className="space-y-10">
+              {STYLES.filter((s) => s.examples.madeWith.photo && s.examples.madeWith.video && s.examples.madeWith.poster).map((s) => (
+                <div key={s.id} className="space-y-3" data-testid={`made-with-${s.id}`}>
+                  {STYLES.length > 1 ? (
+                    <p className="text-sm">
+                      <span className="font-semibold">{styleCopy(s.id).name}</span>
+                      <span className="text-muted"> · {styleCopy(s.id).tagline}</span>
+                    </p>
+                  ) : null}
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+                    <figure>
+                      <img src={s.examples.madeWith.photo} alt={c.alt.inputPhoto} loading="lazy" className="aspect-[3/4] w-full rounded-2xl object-cover ring-1 ring-line" />
+                      <figcaption className="mt-2 text-center text-xs text-muted">{c.madeWith.photoLabel}</figcaption>
+                    </figure>
+                    <ArrowRight className="size-6 text-muted" aria-hidden />
+                    <div>
+                      <VideoCard video={s.examples.madeWith.video} poster={s.examples.madeWith.poster} />
+                      <p className="mt-2 text-center text-xs text-muted">{c.madeWith.resultLabel}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       {/* What is：解释趋势本身，承接 "what is {keyword}" 信息型搜索 */}
       <section id="about" className="scroll-mt-20 py-20">
@@ -280,32 +302,22 @@ function Home() {
         </div>
       </section>
 
-      {/* Ideas：左右交替 */}
+      {/* Ideas：保留创作场景说明，真实示例视频准备好后再添加媒体 */}
       <section className="border-t border-line py-20">
         <div className="container-page">
           <p className="eyebrow text-accent-text">{c.ideas.eyebrow}</p>
           <h2 className="mt-3 font-display text-4xl leading-tight sm:text-5xl">{c.ideas.title}</h2>
-          <div className="mt-14 space-y-20">
-            {c.ideas.items.map((idea, index) => {
-              const media = ex.ideas[index % ex.ideas.length]!
-              const flip = index % 2 === 1
-              return (
-                <div key={idea.title} className="grid items-center gap-10 md:grid-cols-2">
-                  <div className={`grid grid-cols-[0.8fr_1fr] items-end gap-4 ${flip ? 'md:order-2' : ''}`}>
-                    <img src={media.photo} alt={c.alt.inputPhoto} loading="lazy" className="aspect-[3/4] w-full rounded-2xl object-cover ring-1 ring-line" />
-                    <VideoCard video={media.video} poster={media.poster} />
-                  </div>
-                  <div className="space-y-4">
-                    <span className="font-display text-5xl text-accent">0{index + 1}</span>
-                    <h3 className="font-display text-3xl">{idea.title}</h3>
-                    <p className="max-w-md text-lg leading-8 text-muted">{idea.body}</p>
-                    <a href="#create" className="inline-flex items-center gap-1.5 text-sm font-semibold hover:text-accent">
-                      {c.ideas.cta} <ArrowRight className="size-4" />
-                    </a>
-                  </div>
-                </div>
-              )
-            })}
+          <div className="mt-12 grid gap-5 md:grid-cols-3">
+            {c.ideas.items.map((idea, index) => (
+              <article key={idea.title} className="card p-6">
+                <span className="font-display text-4xl text-accent">0{index + 1}</span>
+                <h3 className="mt-4 font-display text-2xl">{idea.title}</h3>
+                <p className="mt-3 leading-7 text-muted">{idea.body}</p>
+                <a href="#create" className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold hover:text-accent">
+                  {c.ideas.cta} <ArrowRight className="size-4" />
+                </a>
+              </article>
+            ))}
           </div>
         </div>
       </section>

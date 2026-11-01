@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="logo-gradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e34a32"/>
+      <stop offset="50%" stop-color="#f05a3c"/>
+      <stop offset="100%" stop-color="#e34a32"/>
+    </linearGradient>
+  </defs>
+  <!-- 背景 -->
+  <rect width="120" height="120" rx="24" fill="url(#logo-gradient)"/>
+  <!-- 播放图标 -->
+  <path d="M 42 35 L 42 85 L 88 60 Z" fill="#ffffff" opacity="0.95"/>
+</svg>

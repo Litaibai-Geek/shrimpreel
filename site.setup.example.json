@@ -1,0 +1,45 @@
+{
+  "site": {
+    "adminEmail": "admin@example.com"
+  },
+  "google": {
+    "clientId": ""
+  },
+  "payment": {
+    "provider": "waffo",
+    "environment": "test",
+    "storeId": "",
+    "createProducts": false,
+    "testPackageEnabled": false
+  },
+  "video": {
+    "provider": "kie"
+  },
+  "moderation": {
+    "provider": "openai"
+  },
+  "email": {
+    "from": null,
+    "loginEnabled": false,
+    "routing": {
+      "enabled": false,
+      "destination": ""
+    }
+  },
+  "secrets": {
+    "file": ".dev.vars.production",
+    "sync": true
+  },
+  "platforms": {
+    "cloudflare": {
+      "turnstile": true,
+      "analytics": false
+    },
+    "resend": {
+      "enabled": false,
+      "dns": false,
+      "allowMx": false,
+      "createSendingKey": false
+    }
+  }
+}

@@ -2,6 +2,7 @@
 // 文案在 src/content/<locale>.ts，通过 {keyword} 等变量自动套用。
 
 import type { ThemeName } from '#/lib/theme'
+import { demoMedia } from './demo-media.ts'
 
 export const LOCALES = ['en', 'zh'] as const
 export type Locale = (typeof LOCALES)[number]
@@ -15,57 +16,58 @@ export const LOCALE_META: Record<Locale, { tag: string; ogLocale: string; name: 
 }
 
 export const site = {
-  keyword: 'Neon Shuffle',
-  brandName: 'Neon Shuffle AI',
-  logoMark: 'NS',
-  domain: 'example.com',
-  supportEmail: 'support@example.com',
+  keyword: 'Tiny Desk',
+  brandName: 'Tiny Desk AI',
+  logoMark: 'TD',
+  domain: 'tinydeskai.website',
+  supportEmail: 'support@tinydeskai.website',
+  // 仅供管理员测试真实收款，由 site.setup.json 的开关同步。
+  testPaymentEnabled: true as boolean,
   // 社媒平台名称（用于 “Viral on TikTok” 之类标签）
   trendPlatform: 'TikTok',
   ogImage: '/og.png',
   // 页面主题，可选值和效果见 src/lib/theme.ts
-  theme: 'classic' as ThemeName,
+  theme: 'studio' as ThemeName,
 
-  // 生成模板的共用参数：provider 输出时长 = 源视频时长，所以每种风格的每个时长档位各有一段剪好的源视频（见 styles[].sources）。
+  // Kie 使用固定 14 秒参考视频；fal / yir / NanoAPI 继续使用与输出时长匹配的参考片段。
   template: {
     aspectRatio: '9:16',
-    fullSeconds: 18,
+    fullSeconds: 15,
   },
 
-  // 舞蹈风格：一个站点可以配多种，第一个是默认风格；只有一种时界面不显示风格选择。
+  // 表演场景：一个站点可以配置多种，第一个是默认场景；只有一种时界面不显示场景选择。
   // 源视频上传到 R2 的 templates/<文件名>，由 /media/templates/<文件名> 公开提供给 provider 拉取。
   // 风格的展示名和一句话介绍写在 src/content/<locale>.ts 的 styles[id]（缺了 typecheck 报错）。
   styles: [
     {
       // 写入 generations.template_id，发布后不要改
-      id: 'neon-shuffle-v1',
+      id: 'tiny-desk-v1',
       // 键 = durations[].id，每个档位都要有
-      sources: { short: 'neon-shuffle-v1-6s.mp4', medium: 'neon-shuffle-v1-12s.mp4', full: 'neon-shuffle-v1-18s.mp4' },
-      // 这种风格的 prompt，覆盖 video.yir.prompt 和 video.nanoapi.prompt；null = 用默认
+      // 旧 provider 按输出时长匹配参考片段；Kie 单独使用 14 秒 reference。旧 18 秒任务保留兼容素材。
+      sources: {
+        short: 'tiny-desk-v1-6s.mp4',
+        medium: 'tiny-desk-v1-12s.mp4',
+        full: 'tiny-desk-v1-15s.mp4',
+        reference: 'tiny-desk-v1-reference-14s.mp4',
+        legacyFull: 'tiny-desk-v1-18s.mp4',
+      },
+      // 这种风格的 prompt，覆盖 video.yir.prompt、video.nanoapi.prompt 和 video.kie.prompt；null = 用默认
       prompt: null as string | null,
       // yir 两步走（可选）：先用图片模型把照片里的人合成进源视频首帧，再拿合成图做动作参考，成片保留源视频的场景。
       // null = 单步，直接用用户照片做参考，背景会变成照片的背景。图片模型等共用参数在 video.yir.sceneImage
       scene: null as StyleScene | null,
-      // 首页展示素材（public/demo/）。换成真实素材时必须拥有授权，credit 写原作者，例如 '@handle · TikTok'。
+      // 首页展示站长替换的真实 AI 生成样片；旧文件名保留。R2 的参考视频是另一份素材。
       examples: {
-        original: { video: '/demo/original.mp4', poster: '/demo/original.jpg', credit: 'Demo clip · original' },
-        aiVersions: [
-          { video: '/demo/ai1.mp4', poster: '/demo/ai1.jpg', credit: 'Demo clip · AI render' },
-          { video: '/demo/ai2.mp4', poster: '/demo/ai2.jpg', credit: 'Demo clip · AI render' },
-        ],
-        madeWith: { photo: '/demo/sample-photo.jpg', video: '/demo/madeWith.mp4', poster: '/demo/madeWith.jpg' },
+        previews: [demoMedia.band, demoMedia.singer, demoMedia.sax],
+        // 输入照片 → AI 成片对比需取得对应原图与公开展示许可，不能用不相关图片充当输入图。
+        madeWith: { photo: '', video: '', poster: '' },
       },
     },
   ],
 
-  // 全站共用的首页展示素材
+  // 全站共用的首页创作场景文案；表演视频预览配置在 styles[].examples.previews。
   examples: {
-    // “创意”区块：每条 = 一张示例照片 + 一段成片
-    ideas: [
-      { photo: '/demo/sample-photo.jpg', video: '/demo/ai1.mp4', poster: '/demo/ai1.jpg' },
-      { photo: '/demo/sample-photo.jpg', video: '/demo/ai2.mp4', poster: '/demo/ai2.jpg' },
-      { photo: '/demo/sample-photo.jpg', video: '/demo/madeWith.mp4', poster: '/demo/madeWith.jpg' },
-    ],
+    ideas: [],
   },
 
   // 视频模型，服务商由 VIDEO_PROVIDER 选择。换模型时同时检查 src/server/video/ 下对应文件的入参与出参。
@@ -107,12 +109,26 @@ export const site = {
       // genjutsu-1.0：480p $0.117/s、720p $0.273/s、1080p $0.78/s。motion_control 计费秒数 = 源视频秒数四舍五入、至少 4 秒；replace_object 向上取整
       costCentsPerSecond: 11.7,
     },
+    // Kie.ai Seedance 2.0 Mini：人像照片 + R2 内置动作参考视频，多模态 reference-to-video。
+    // 720p 带视频参考的当前公开单价为 5 credits / (输入视频秒 + 输出视频秒)；1 credit = $0.005。
+    // 模板输入视频和输出时长相同，因此估算成本约 $0.05 / 输出秒；以任务返回的 creditsConsumed 记录实际成本。
+    kie: {
+      model: 'bytedance/seedance-2-mini',
+      resolution: '720p',
+      aspectRatio: '9:16',
+      generateAudio: true,
+      usdPerCredit: 0.005,
+      estimatedCreditsPerBillableSecond: 5,
+      // 固定参考视频 14 秒；成本估算按“输入参考视频秒数 + 输出视频秒数”计算。实际以 creditsConsumed 为准。
+      referenceVideoSeconds: 14,
+      prompt: 'Use Image 1 as the identity reference for the main performer. Recreate the movements, choreography, gestures, timing, camera framing, and scene from Video 1. Replace the original performer in Video 1 with the person from Image 1 while preserving the reference video’s setting, background, lighting, camera movement, and overall composition. Keep the person’s face and identity consistent throughout. Do not add extra people or change the scene.',
+    },
   },
 
   durations: [
     { id: 'short', seconds: 6, credits: 6 },
     { id: 'medium', seconds: 12, credits: 12 },
-    { id: 'full', seconds: 18, credits: 18, isFull: true },
+    { id: 'full', seconds: 15, credits: 15, isFull: true },
   ],
 
   // 积分包：一次性购买，买的积分永不过期（赠送积分可以设有效期，扣费时先扣快到期的）。价格用于展示与订单记录，实际收费以支付商后台为准。
@@ -129,7 +145,7 @@ export const site = {
   // 开关 subscriptionsEnabled：false 时不再卖新订阅（定价页、条款、退款政策和 FAQ 里的订阅内容一起隐藏，下单接口拒绝套餐），
   // 已有订阅照常续费、退款，账单页仍能取消和进门户；这时要保留 *_PRODUCTS 里套餐的商品，支付商 webhook 也别退订订阅事件。
   // 使用手册见 docs/subscriptions.md
-  subscriptionsEnabled: true as boolean,
+  subscriptionsEnabled: false as boolean,
   plans: [
     { id: 'monthly', interval: 'month', credits: 60, priceCents: 1490, currency: 'USD' },
     { id: 'yearly', interval: 'year', credits: 60, priceCents: 14900, currency: 'USD', highlight: true },
@@ -174,16 +190,16 @@ export const site = {
   // cover 可选：public/ 下 1200×630 的图片路径，用在列表卡片、文章顶部、og:image 和 Article 的 image；
   // 用 scripts/article-cover.mjs 从站点自己的视频截帧生成（带标题、标签，可选多种版式）。不填时卡片没有图，og:image 用站点默认图
   articles: [
-    { key: 'trend', slug: 'neon-shuffle-ai-trend', publishedAt: '2026-10-20', updatedAt: '2026-10-20', cover: '/guides/neon-shuffle-ai-trend.jpg' },
-    { key: 'howTo', slug: 'how-to-make-neon-shuffle-ai-video', publishedAt: '2026-10-20', updatedAt: '2026-10-20' },
+    { key: 'trend', slug: 'tiny-desk-ai-trend', publishedAt: '2026-10-30', updatedAt: '2026-10-31' },
+    { key: 'howTo', slug: 'how-to-make-tiny-desk-ai-video', publishedAt: '2026-10-30', updatedAt: '2026-10-31' },
   ],
 
   seo: {
     // 长尾词：不输出 meta keywords（Google 不用），由 npm run seo:check 检查首页正文是否覆盖
-    secondaryKeywords: ['Neon Shuffle AI', 'Neon Shuffle video', 'Neon Shuffle trend', 'AI dance video'],
+    secondaryKeywords: ['Tiny Desk AI generator', 'Tiny Desk AI video generator', 'Tiny Desk AI video from a photo', 'how to make a Tiny Desk AI video', 'AI Tiny Desk performance', 'Tiny Desk-style AI video', 'Outstanding Tiny Desk AI'],
     // 首次上线日期与站点页面（首页、价格、法律页等）最近一次内容更新日期：首页视频 uploadDate、sitemap lastmod。文章用各自的日期
-    publishedAt: '2026-10-20',
-    updatedAt: '2026-10-20',
+    publishedAt: '2026-10-30',
+    updatedAt: '2026-10-31',
     // Search Console / Bing Webmaster 选“HTML 标记”验证时填 content 值；用 DNS 验证则留空
     googleVerification: '',
     bingVerification: '',
@@ -200,7 +216,7 @@ export const site = {
   // Umami 不写 Cookie，不受同意横幅控制。
   // 隐私政策的“Cookie 与统计”一节按这三项自动调整
   analytics: {
-    ga4Id: '',
+    ga4Id: 'G-W2Q5WH0W6Y',
     cfBeaconToken: '',
     umamiWebsiteId: '',
   },
@@ -235,6 +251,7 @@ export interface SubscriptionPlan {
 }
 
 export interface ExampleClip {
+  label: string
   video: string
   poster: string
   credit: string
@@ -242,12 +259,11 @@ export interface ExampleClip {
 
 export interface Style {
   id: string
-  sources: Readonly<Record<DurationOption['id'], string>> // 键 = durations[].id，值 = seed/templates/ 里的文件名
+  sources: Readonly<Record<DurationOption['id'], string> & { reference: string; legacyFull?: string }> // 输出时长映射 + Kie 固定参考片 + 旧 18 秒兼容片
   prompt: string | null
   scene: StyleScene | null
   examples: {
-    original: ExampleClip
-    aiVersions: readonly ExampleClip[]
+    previews: readonly ExampleClip[]
     madeWith: { photo: string; video: string; poster: string }
   }
 }

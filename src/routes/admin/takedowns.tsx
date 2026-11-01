@@ -25,6 +25,7 @@ type TakedownRow = {
   generation_removed_at: string | null
   has_output: number | null
   owner_email: string | null
+  band_upload_ids: string | null
 }
 
 const REASONS: Record<string, string> = {
@@ -35,7 +36,7 @@ const REASONS: Record<string, string> = {
   other: '其他',
 }
 
-// 举报处理：open 按截止时间升序。下架会删除同一原图的所有成片与原图，并拉黑该图片哈希
+// 举报处理：Solo 清理同源；Band 必须明确选择被举报者或全部成员。
 function AdminTakedowns() {
   const [status, setStatus] = useState<'open' | 'removed' | 'rejected'>('open')
   const [page, setPage] = useState(1)
@@ -46,11 +47,38 @@ function AdminTakedowns() {
   async function remove(t: TakedownRow) {
     const generationId = prompt('要下架的生成任务 ID（gen_…）', t.generation_id ?? '')?.trim()
     if (!generationId) return
+    let memberUploadId: string | undefined
+    let scope = '被举报视频及其关联照片'
+    if (t.band_upload_ids) {
+      let members: string[] = []
+      try {
+        const value: unknown = JSON.parse(t.band_upload_ids)
+        if (Array.isArray(value) && value.every((id) => typeof id === 'string')) members = value
+      } catch { /* Older tasks may lack valid Band metadata. */ }
+      if (members.length >= 2) {
+        const choice = prompt(
+          `Band 视频有 ${members.length} 位成员（1 主唱、2 键盘、3 萨克斯、4 伴唱、5 鼓手）。请输入受影响成员的序号 1–${members.length}，或明确输入 all 表示全员。留空不会下架。`,
+          '',
+        )
+        if (choice === null || !choice.trim()) return
+        if (choice.trim().toLowerCase() === 'all') {
+          scope = '所有 Band 成员（会把所有人的原图拉黑）'
+        } else {
+          const index = Number(choice.trim())
+          if (!Number.isInteger(index) || index < 1 || index > members.length) {
+            alert('成员序号无效，没有执行下架')
+            return
+          }
+          memberUploadId = members[index - 1]!
+          scope = `第 ${index} 位成员（${memberUploadId}）`
+        }
+      }
+    }
     const note = prompt('处理备注（可选）')?.trim() ?? ''
     const ok = await adminAction(
       `/api/admin/takedowns/${t.id}/resolve`,
-      { action: 'remove', generationId, note },
-      '确认下架？同一原图生成的所有视频和原图都会被删除，且无法恢复。',
+      { action: 'remove', generationId, ...(memberUploadId ? { memberUploadId } : {}), note },
+      `确认永久下架？对象：${scope}。其关联视频与照片会被删除，指定照片会禁止再次上传。`,
     )
     if (ok) await reload()
   }

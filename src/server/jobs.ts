@@ -1,4 +1,5 @@
 import { findDuration, findStyle } from '#/config/site'
+import { isBandUploadIds } from '#/lib/band'
 import { jobToken, signedUploadUrl, templateSourceUrl } from './media'
 import { expireStatements, generationRefundStatements } from './credits'
 import { notifyGenerationFinished } from './notifications'
@@ -59,7 +60,7 @@ export async function storeOutputFromUrl(
   await env.MEDIA.put(key, bytes, { httpMetadata })
   return true
 }
-const POLL_DELAY_SECONDS: Record<string, number> = { mock: 2, fal: 20, yir: 20, nanoapi: 30 }
+const POLL_DELAY_SECONDS: Record<string, number> = { mock: 2, fal: 20, yir: 20, nanoapi: 30, kie: 20 }
 
 export async function enqueueJob(env: Env, message: VideoJobMessage, delaySeconds = 0) {
   await env.VIDEO_QUEUE.send(message, delaySeconds > 0 ? { delaySeconds } : undefined)
@@ -117,40 +118,87 @@ async function submitGeneration(env: Env, generation: GenerationRow) {
 
   const duration = findDuration(generation.duration_id)
   const style = findStyle(generation.template_id)
-  const sourceFile = duration ? style?.sources[duration.id] : undefined
-  const upload = await env.DB.prepare('SELECT * FROM uploads WHERE id = ?').bind(generation.upload_id).first<UploadRow>()
-  if (!duration || !style || !sourceFile || !upload || upload.expired_at) {
+  // Kie 的输出时长与参考输入时长独立；其他 provider 仍使用与输出长度匹配的源视频。
+  // 已排队的旧 full 任务仍可能是 18 秒，保留 legacyFull 兼容素材。
+  const sourceFile = duration
+    ? generation.provider === 'kie'
+      ? style?.sources.reference
+      : generation.duration_seconds > duration.seconds
+        ? style?.sources.legacyFull
+        : style?.sources[duration.id]
+    : undefined
+  const baseMeta = parseMeta(generation.provider_meta)
+  const band = baseMeta.band
+  const maybeBandIds = band && typeof band === 'object' ? (band as { uploadIds?: unknown }).uploadIds : undefined
+  if (baseMeta.mode === 'band' && !isBandUploadIds(maybeBandIds)) {
+    await failGeneration(env, generation.id, 'invalid_band', 'Band photo references are invalid')
+    return
+  }
+  const uploadIds = baseMeta.mode === 'band' && isBandUploadIds(maybeBandIds) ? maybeBandIds : [generation.upload_id]
+  const uploads = await Promise.all(uploadIds.map((id) =>
+    env.DB.prepare('SELECT * FROM uploads WHERE id = ? AND user_id = ? AND expired_at IS NULL')
+      .bind(id, generation.user_id).first<UploadRow>(),
+  ))
+  if (!duration || !style || !sourceFile || uploads.some((u) => !u)) {
     await failGeneration(env, generation.id, 'invalid_input', 'Upload, style or duration no longer exists')
     return
   }
 
   const provider = getVideoProvider(env, generation.provider)
-  const baseMeta = parseMeta(generation.provider_meta)
+  if (baseMeta.mode === 'band' && provider.id !== 'kie' && provider.id !== 'mock') {
+    await failGeneration(env, generation.id, 'unsupported_band_provider', 'Band mode requires Kie')
+    return
+  }
 
   // 签名在 try 里：生产环境 SESSION_SECRET 配错时会抛错，要和提交失败一样放回 queued，交给队列重试和死信退款
+  let providerRequestId: string | null = null
   try {
     const webhookUrl = new URL(`/api/webhooks/${provider.id}`, env.SITE_URL)
     webhookUrl.searchParams.set('gen', generation.id)
     webhookUrl.searchParams.set('token', await jobToken(env, generation.id))
     // 重新提交时请求体要和第一次一致，签名按任务创建时间算（任务 45 分钟超时，2 小时有效期足够）
+    const imageUrls = await Promise.all(uploadIds.map((id) =>
+      signedUploadUrl(env, id, Date.parse(generation.created_at)),
+    ))
     const result = await provider.submit({
       generationId: generation.id,
       style,
       durationSeconds: generation.duration_seconds,
-      imageUrl: await signedUploadUrl(env, upload.id, Date.parse(generation.created_at)),
+      imageUrl: imageUrls[0]!,
+      ...(baseMeta.mode === 'band' ? { imageUrls } : {}),
       sourceVideoUrl: templateSourceUrl(env, sourceFile),
       sourceVideoKey: `templates/${sourceFile}`,
       webhookUrl: webhookUrl.toString(),
       meta: baseMeta,
     })
+    providerRequestId = result.requestId
     const now = nowIso()
     await env.DB.prepare(
       `UPDATE generations SET provider_request_id = ?, provider_meta = ?, started_at = ?, updated_at = ? WHERE id = ?`,
     )
-      .bind(result.requestId, JSON.stringify(result.meta), now, now, generation.id)
+      .bind(result.requestId, JSON.stringify({ ...baseMeta, ...result.meta }), now, now, generation.id)
       .run()
     await enqueueJob(env, { kind: 'poll', generationId: generation.id }, POLL_DELAY_SECONDS[provider.id])
   } catch (error) {
+    if (provider.id === 'kie' && providerRequestId) {
+      // The upstream task exists; if saving its id or queueing the first poll failed, persist the id
+      // and let scheduled maintenance resume polling instead of creating a second billable task.
+      await env.DB.prepare(
+        `UPDATE generations SET status = 'processing', provider_request_id = ?, updated_at = ?
+         WHERE id = ? AND status IN ('queued', 'processing')`,
+      )
+        .bind(providerRequestId, nowIso(), generation.id)
+        .run()
+      return
+    }
+    if (error instanceof VideoProviderError && error.uncertain) {
+      // Kie does not document an idempotency key. A submit network/5xx ambiguity may mean it created
+      // a billable task; keep processing so the signed callback can restore provider_request_id.
+      await env.DB.prepare(`UPDATE generations SET updated_at = ? WHERE id = ? AND status = 'processing'`)
+        .bind(nowIso(), generation.id)
+        .run()
+      return
+    }
     if (error instanceof VideoProviderError && !error.retryable) {
       await failGeneration(env, generation.id, error.code, error.message)
       return
@@ -288,6 +336,13 @@ export async function runScheduledMaintenance(env: Env) {
       await enqueueJob(env, { kind: 'submit', generationId: generation.id })
     } else if (generation.provider_request_id) {
       await enqueueJob(env, { kind: 'poll', generationId: generation.id })
+    } else if (generation.provider === 'kie') {
+      // Ambiguous Kie submit: never submit a second task without an idempotency key.
+      // Wait for the signed callback to supply taskId; the normal 45-minute timeout refunds if it never arrives.
+      await db
+        .prepare(`UPDATE generations SET updated_at = ? WHERE id = ? AND status = 'processing' AND provider_request_id IS NULL`)
+        .bind(nowIso(), generation.id)
+        .run()
     } else if (generation.attempts < 3) {
       // 抢占后、拿到 request id 前 Worker 中断：放回队列重新提交
       await db

@@ -6,6 +6,7 @@ export interface VideoSubmitInput {
   style: Style
   durationSeconds: number
   imageUrl: string
+  imageUrls?: string[] // ordered Band images, undefined for Solo/legacy jobs
   sourceVideoUrl: string
   sourceVideoKey: string
   webhookUrl: string
@@ -25,7 +26,7 @@ export type VideoStatus =
   | { state: 'failed'; code: string; message: string; retryable?: boolean }
 
 export interface VideoProvider {
-  id: 'fal' | 'yir' | 'nanoapi' | 'mock'
+  id: 'fal' | 'yir' | 'nanoapi' | 'kie' | 'mock'
   submit(input: VideoSubmitInput): Promise<VideoSubmitResult>
   status(requestId: string, meta: Record<string, unknown>): Promise<VideoStatus>
   // 出一条成片的估算成本（美分），出片后写入 generations.provider_cost_cents
@@ -33,12 +34,15 @@ export interface VideoProvider {
   costCents(durationSeconds: number, styleId: string): number
 }
 
-// 可重试错误（网络/限流/5xx）：队列会重投；不可重试错误直接失败并退积分
+// 可重试错误由队列重投；不可重试错误直接失败并退积分；uncertain 表示上游可能已受理，等待回调恢复任务 ID
 export class VideoProviderError extends Error {
   constructor(
     readonly code: string,
     message: string,
     readonly retryable: boolean,
+    // The upstream may have accepted a submit whose response was lost. Do not blindly resubmit;
+    // keep the generation processing and wait for a provider callback to recover its task id.
+    readonly uncertain = false,
   ) {
     super(message)
   }

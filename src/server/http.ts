@@ -1,5 +1,6 @@
 import type { Context } from 'hono'
 import { outputExpiresAt } from './retention'
+import { isBandUploadIds } from '#/lib/band'
 import type { AppContext, GenerationRow, OrderRow, UserRow } from './types'
 import { ApiError, createId, nowIso } from './util'
 
@@ -52,8 +53,15 @@ export async function audit(
 }
 
 export function publicGeneration(g: GenerationRow) {
+  let memberCount = 1
+  try {
+    const meta = JSON.parse(g.provider_meta ?? '{}') as { band?: { uploadIds?: unknown } }
+    if (isBandUploadIds(meta?.band?.uploadIds)) memberCount = meta.band!.uploadIds!.length
+  } catch { /* Legacy tasks remain Solo. */ }
   return {
     id: g.id,
+    mode: memberCount > 1 ? 'band' : 'solo',
+    memberCount,
     templateId: g.template_id,
     durationId: g.duration_id,
     durationSeconds: g.duration_seconds,

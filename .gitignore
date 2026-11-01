@@ -19,3 +19,6 @@ playwright-report/
 !.claude/skills/sync-upstream/
 !.claude/skills/launch-audit/
 *.local.md
+site.setup.json
+
+!.dev.vars.platform.example
