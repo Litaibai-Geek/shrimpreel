@@ -24,11 +24,12 @@
     // 交易邮件发件地址，域名须在 Cloudflare Email Service 完成 Onboard；留空 = 不发信（后台“邮件”页记为 skipped）
     "EMAIL_FROM": "noreply@tinydeskai.website",
     "WAFFO_ENVIRONMENT": "test",
-    // Waffo 店铺 ID（STO_xxx，公开）：订阅的客户门户要用；只卖积分包可以留空
+    // Waffo 店铺 ID（STO_xxx，公开）：由站点初始化从 site.setup.json 同步
     "WAFFO_STORE_ID": "",
+    "WAFFO_PRODUCTS": "{}",
     "DODO_ENVIRONMENT": "test",
     // 每个积分包、订阅套餐对应支付商的 product id（JSON：{"starter":"PROD_xxx","monthly":"PROD_yyy",...}）
-    "WAFFO_PRODUCTS": "{}",
+    // WAFFO_PRODUCTS 可由站点初始化创建商品后写入
     "DODO_PRODUCTS": "{}",
     // Stripe：test | live，要和 STRIPE_SECRET_KEY 的模式一致；STRIPE_PRODUCTS 存 Price ID（price_...），scripts/stripe-setup.mjs 可以生成
     "STRIPE_ENVIRONMENT": "test",
@@ -37,7 +38,7 @@
     // Opt-in only after 0016 migration, a verified sender and Turnstile.
     "EMAIL_LOGIN_ENABLED": "false",
     // Cloudflare Turnstile 站点密钥（公开）；留空 = 不启用。启用时必须同时 `wrangler secret put TURNSTILE_SECRET_KEY`
-    "TURNSTILE_SITE_KEY": "",
+    "TURNSTILE_SITE_KEY": "你的站点密钥",  // 👈 从 Cloudflare Dashboard 复制站点密钥
     // Umami 实例地址（不带路径的 https origin，如 https://umami.example.com）；留空 = 不代理。只在 Worker 端使用，不进前端
     "UMAMI_ORIGIN": "",
     // 上传图片审核：openai（需 OPENAI_API_KEY）| none | mock（mock 只允许非 production）

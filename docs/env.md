@@ -89,7 +89,7 @@
 
 - 先备份 D1，应用新增的 0016_email_login.sql。原用户 id、google_sub、积分、订单及会话不变，老 Google 用户 email_login_enabled 默认为 0。
 - 配置可向真实用户投递的 EMAIL_FROM（建议已验证的 Resend 发信域）、RESEND_API_KEY、Turnstile 的 Site Key 和 Secret。
-- 在 wrangler.jsonc 将 EMAIL_LOGIN_ENABLED 改为 true，重新构建并部署。默认 false 为安全关闭状态。
+- 在 site.setup.json 将 `email.loginEnabled` 设为 true；完成真实投递测试、远端迁移和密钥同步后，用 `npm run setup -- --apply --email-login-tested` 同步到 Wrangler，再重新构建并部署。默认 false 为安全关闭状态。
 - 新邮箱用户通过 8 位、10 分钟有效的一次性验证码注册；已有 Google 用户必须先 Google 登录并在“账户设置”验证自己的邮箱后，才允许用验证码登录同一个账号。
 - 旧 Google 账号不会因仅收到 OTP 就自动绑定；管理员账户仍只允许 Google 登录。登录后沿用原 sessions 和 users.id，不迁移历史订单/积分。
 - 请在正式收费前测试：验证码错误/过期/重放、邮件不可达、Email Service 配额、邮件枚举与限流、Google/Email 绑定后仍拥有原积分和订单；以及账户注销后验证码失效。

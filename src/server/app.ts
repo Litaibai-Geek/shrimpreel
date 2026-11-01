@@ -15,6 +15,7 @@ import { clawbackStatements, expireStatements, ledgerStatements } from './credit
 import { CSP_REPORT_PATH, summarizeCspReports } from './csp'
 import { exchangeGoogleCode, googleAuthRedirect, googleClientId, googleOAuthConfig, verifyGoogleIdToken } from './google'
 import { consumeEmailCode, emailLoginAvailable, normalizedLoginEmail, requestEmailCode } from './email-auth'
+import { registerWithPassword, signInWithPassword } from './password-auth'
 import { publicGeneration, publicOrder, rateLimit, readJson, requireUser, pageParams } from './http'
 import { enqueueJob, failGeneration, handleDeadLetter, handleVideoJob } from './jobs'
 import { jobToken, serveR2Object, sniffImageType, verifyUploadSignature } from './media'
@@ -272,6 +273,53 @@ app.post('/api/auth/dev-login', async (c) => {
 app.post('/api/auth/logout', async (c) => {
   await endSession(c)
   return c.json({ ok: true })
+})
+
+// 密码注册（当 EMAIL_LOGIN_ENABLED=false 时使用）
+app.post('/api/auth/password/register', async (c) => {
+  await rateLimit(c.env.AUTH_LIMITER, 'register-ip:' + (c.req.header('cf-connecting-ip') ?? 'local'))
+
+  const { name, email, password, locale, turnstileToken } = await readJson<{
+    name?: string
+    email: string
+    password: string
+    locale: string
+    turnstileToken: string
+  }>(c)
+
+  // Turnstile 验证（必需）
+  await verifyTurnstile(c.env, turnstileToken, c.req.header('cf-connecting-ip'))
+
+  const user = await registerWithPassword(c.env, {
+    name,
+    email,
+    password,
+    ip: c.req.header('cf-connecting-ip') ?? 'local',
+    locale,
+    country: c.req.header('cf-ipcountry') ?? null,
+    attribution: requestAttribution(c, 'first'),
+    referral: await requestReferral(c),
+  })
+
+  await startSession(c, user.id)
+  c.header('Cache-Control', 'no-store')
+  return c.json({ user: publicUser(user) })
+})
+
+// 密码登录
+app.post('/api/auth/password/signin', async (c) => {
+  await rateLimit(c.env.AUTH_LIMITER, 'signin-ip:' + (c.req.header('cf-connecting-ip') ?? 'local'))
+
+  const { email, password, locale } = await readJson<{
+    email: string
+    password: string
+    locale?: string
+  }>(c)
+
+  const user = await signInWithPassword(c.env, { email, password })
+  await startSession(c, user.id)
+  c.header('Cache-Control', 'no-store')
+  return c.json({ user: publicUser(user) })
 })
 
 // ---------- Uploads ----------

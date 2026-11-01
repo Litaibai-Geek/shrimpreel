@@ -8,7 +8,7 @@
 // 可选：--brand（默认 "<keyword> AI"）--logo（默认首字母）--slug（默认 keyword 的 kebab-case）
 //       --name（Worker 与 D1/R2/Queue 前缀，默认 slug）--email（默认 support@<domain>）
 //       --platform（默认不变）--date（站点与文章的 publishedAt/updatedAt，默认今天）
-import { createHash } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { site } from '../src/config/site.ts'
 
@@ -131,6 +131,19 @@ if (oldName !== name) {
   wrangler = wrangler.split(`"${oldName}"`).join(`"${name}"`).split(`"${oldName}-`).join(`"${name}-`)
   changes.push(`${wranglerFile}  ${count} 处资源名 ${oldName} → ${name}`)
 }
+// 只有站点身份变化时清理站点专属值，避免在已有站点重复运行时破坏生产配置。
+if (oldName !== name || site.domain !== domain) {
+  for (const key of ['WAFFO_PRODUCTS', 'DODO_PRODUCTS', 'STRIPE_PRODUCTS']) {
+    wrangler = replaceOnce(wrangler, wranglerFile, `${key} 清空`, new RegExp(`("${key}": )"(?:[^"\\\\]|\\\\.)*"`), '$1"{}"')
+  }
+  for (const key of ['GOOGLE_CLIENT_ID', 'TURNSTILE_SITE_KEY']) {
+    wrangler = replaceOnce(wrangler, wranglerFile, `${key} 清空`, new RegExp(`("${key}": )"(?:[^"\\\\]|\\\\.)*"`), '$1""')
+  }
+  for (const key of ['WAFFO_ENVIRONMENT', 'DODO_ENVIRONMENT', 'STRIPE_ENVIRONMENT']) {
+    wrangler = replaceOnce(wrangler, wranglerFile, `${key} 重置为 test`, new RegExp(`("${key}": )"[^"]*"`), '$1"test"')
+  }
+  wrangler = replaceOnce(wrangler, wranglerFile, 'EMAIL_LOGIN_ENABLED 关闭', /("EMAIL_LOGIN_ENABLED": )"[^"]*"/, '$1"false"')
+}
 // 资源 id 属于旧站，新站要重新创建
 wrangler = wrangler.replace(/("database_id": )"(?!0{8}-)[^"]+"/, (_, p) => {
   changes.push(`${wranglerFile}  database_id 重置为占位值`)
@@ -166,6 +179,20 @@ if (write) {
   writeFileSync(wranglerFile, wrangler)
   writeFileSync(pkgFile, pkg)
   if (removeStaging) rmSync(stagingFile)
+  if (!existsSync('site.setup.json')) {
+    writeFileSync('site.setup.json', readFileSync('site.setup.example.json', 'utf8'), { flag: 'wx' })
+    console.log('已从示例创建 site.setup.json，请填写管理员邮箱和需要的服务配置。')
+  } else {
+    console.log('保留已有 site.setup.json；请核对其中的站点身份和服务配置。')
+  }
+  if (!existsSync('.dev.vars.production')) {
+    const sample = readFileSync('.dev.vars.example', 'utf8')
+    const secrets = sample.replace(/^SESSION_SECRET=.*$/m, () => 'SESSION_SECRET=' + randomBytes(32).toString('hex'))
+    writeFileSync('.dev.vars.production', secrets, { flag: 'wx', mode: 0o600 })
+    console.log('已创建本地生产密钥文件并生成 SESSION_SECRET，请填写所需服务密钥。')
+  } else {
+    console.log('保留已有生产密钥文件；请确认密钥属于新站。')
+  }
   console.log('\n已写入。')
 } else {
   console.log('\n仅预览，加 --write 写入。')

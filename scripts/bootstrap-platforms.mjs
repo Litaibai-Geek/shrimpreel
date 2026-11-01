@@ -4,6 +4,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { parseDotenv } from './sync-secrets.mjs'
+import { site } from '../src/config/site.ts'
 
 export function platformOptions(args) {
   const modes = ['--plan', '--apply', '--verify'].filter((x) => args.includes(x))
@@ -12,19 +13,35 @@ export function platformOptions(args) {
 }
 
 export function platformConfig(setup) {
-  const domain = setup?.site?.domain
+  const domain = setup?.site?.domain || site.domain
   if (typeof domain !== 'string' || !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain)) {
     throw new Error('Invalid site domain')
   }
   const cloudflare = setup.platforms?.cloudflare ?? {}
   const resend = setup.platforms?.resend ?? {}
-  if ((cloudflare.turnstile || cloudflare.analytics) && !/^[a-f0-9]{32}$/i.test(cloudflare.accountId ?? '')) {
-    throw new Error('Cloudflare accountId (32 hex) is required')
-  }
-  if (resend.enabled && resend.dns && !/^[a-f0-9]{32}$/i.test(cloudflare.zoneId ?? '')) {
-    throw new Error('Cloudflare zoneId is required for Resend DNS')
+  for (const key of ['accountId', 'zoneId']) {
+    if (cloudflare[key] && !/^[a-f0-9]{32}$/i.test(cloudflare[key])) throw new Error('Invalid Cloudflare ' + key)
   }
   return { domain, cloudflare, resend }
+}
+
+// 根据站点域名查找现有 Zone；只接受唯一结果，不自动创建或切换 DNS。
+export async function discoverCloudflareIds(api, domain, configured) {
+  if (!api) throw new Error('Cloudflare token required to discover accountId/zoneId')
+  const labels = domain.split('.')
+  let zone = null
+  for (let i = 0; i <= labels.length - 2; i++) {
+    const name = labels.slice(i).join('.')
+    const rows = await cloudflarePages(api, '/zones?name=' + encodeURIComponent(name))
+    zone = onlyOne(rows.filter((row) => row.name?.toLowerCase() === name), 'Cloudflare zone for ' + name)
+    if (zone) break
+  }
+  if (!zone) throw new Error('Cloudflare zone not found or inaccessible for ' + domain + '; check domain and token permissions')
+  const accountId = zone.account?.id
+  if (!/^[a-f0-9]{32}$/i.test(zone.id ?? '') || !/^[a-f0-9]{32}$/i.test(accountId ?? '')) throw new Error('Cloudflare zone returned invalid account or zone ID')
+  if (configured.accountId && configured.accountId.toLowerCase() !== accountId.toLowerCase()) throw new Error('Cloudflare accountId conflicts with domain zone')
+  if (configured.zoneId && configured.zoneId.toLowerCase() !== zone.id.toLowerCase()) throw new Error('Cloudflare zoneId conflicts with domain zone')
+  return { ...configured, accountId, zoneId: zone.id }
 }
 
 export function createApiClient(base, token, fetcher = fetch) {
@@ -225,8 +242,12 @@ export async function main(args = process.argv.slice(2), overrides = {}) {
   try {
     const mode = platformOptions(args)
     const read = overrides.read ?? readFileSync
-    const setup = JSON.parse(read('site.setup.json', 'utf8'))
-    const { cloudflare, resend } = platformConfig(setup)
+    const argValue = (key, fallback) => { const i = args.indexOf(key); return i >= 0 && args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : fallback }
+    const setupFile = argValue('--config', 'site.setup.json')
+    const wranglerFile = argValue('--wrangler', 'wrangler.jsonc')
+    const setupText = read(setupFile, 'utf8')
+    const setup = JSON.parse(setupText)
+    let { cloudflare, resend, domain } = platformConfig(setup)
     if (mode === '--plan') {
       log('V2 plan only, no network or write: Turnstile=' + Boolean(cloudflare.turnstile)
         + ' Analytics=' + Boolean(cloudflare.analytics) + ' Resend=' + Boolean(resend.enabled))
@@ -235,17 +256,27 @@ export async function main(args = process.argv.slice(2), overrides = {}) {
     const vars = overrides.vars ?? loadPlatformEnv('.dev.vars.platform')
     const cf = vars.CLOUDFLARE_API_TOKEN ? createApiClient('https://api.cloudflare.com/client/v4', vars.CLOUDFLARE_API_TOKEN, overrides.fetcher) : null
     const email = vars.RESEND_ADMIN_API_KEY ? createApiClient('https://api.resend.com', vars.RESEND_ADMIN_API_KEY, overrides.fetcher) : null
+    const needsAccount = cloudflare.turnstile || cloudflare.analytics
+    const needsZone = resend.enabled && resend.dns
+    if ((needsAccount && !cloudflare.accountId) || needsZone) {
+      cloudflare = await discoverCloudflareIds(cf, domain, cloudflare)
+      setup.platforms.cloudflare = cloudflare
+      log('Cloudflare account and zone discovered for ' + domain)
+    }
+    const secretsFile = setup.secrets?.file || '.dev.vars.production'
+    if (!/^\.dev\.vars\.[A-Za-z0-9_-]+$/.test(secretsFile) || secretsFile === '.dev.vars.platform') throw new Error('Invalid runtime secrets file')
     const current = {
-      wrangler: read('wrangler.jsonc', 'utf8'),
+      wrangler: read(wranglerFile, 'utf8'),
       siteCode: read('src/config/site.ts', 'utf8'),
-      secrets: read('.dev.vars.production', 'utf8'),
+      secrets: read(secretsFile, 'utf8'),
     }
     const result = await runProvisioning({ setup, current, apply: mode === '--apply', cf, resend: email, log })
     if (mode === '--apply') {
       const write = overrides.write ?? writeFileSync
-      if (result.secrets !== current.secrets) write('.dev.vars.production', result.secrets, { mode: 0o600 })
-      if (result.wrangler !== current.wrangler) write('wrangler.jsonc', result.wrangler)
+      if (result.secrets !== current.secrets) write(secretsFile, result.secrets, { mode: 0o600 })
+      if (result.wrangler !== current.wrangler) write(wranglerFile, result.wrangler)
       if (result.siteCode !== current.siteCode) write('src/config/site.ts', result.siteCode)
+      if (JSON.stringify(JSON.parse(setupText)) !== JSON.stringify(setup)) write(setupFile, JSON.stringify(setup, null, 2) + '\n')
     }
     log('Completed; no Worker deployment performed.')
     return 0

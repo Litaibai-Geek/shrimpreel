@@ -7,6 +7,7 @@ export interface UserRow {
   name: string | null
   avatar_url: string | null
   google_sub: string | null
+  password_hash?: string | null // 密码哈希（密码注册时使用）
   email_login_enabled?: number
   role: UserRole
   status: UserStatus

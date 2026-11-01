@@ -82,7 +82,7 @@ describe('sync-secrets', () => {
     const wranglerFile = join(dir, 'wrangler.jsonc')
     const secretsFile = join(dir, '.dev.vars.production')
     writeFileSync(wranglerFile, JSON.stringify(config))
-    writeFileSync(secretsFile, `SESSION_SECRET=${STRONG}\nFAL_KEY=fal-secret-value\n`)
+    writeFileSync(secretsFile, `SESSION_SECRET=${STRONG}\nFAL_KEY=fal-secret-value\nRESEND_API_KEY=\n`)
 
     const run = (args: string[], { remote = '[{"name":"SESSION_SECRET","type":"secret_text"}]' as string | null, ignored = true } = {}) => {
       const calls: { args: string[]; input?: string }[] = []

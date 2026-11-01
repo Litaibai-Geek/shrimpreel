@@ -1,7 +1,5 @@
 {
   "site": {
-    "name": "tinydeskai",
-    "domain": "tinydeskai.website",
     "adminEmail": "admin@example.com"
   },
   "google": {
@@ -13,8 +11,15 @@
     "storeId": "",
     "createProducts": false
   },
-  "turnstile": {
-    "siteKey": ""
+  "video": {
+    "provider": "kie"
+  },
+  "moderation": {
+    "provider": "openai"
+  },
+  "email": {
+    "from": null,
+    "loginEnabled": false
   },
   "secrets": {
     "file": ".dev.vars.production",
@@ -22,9 +27,7 @@
   },
   "platforms": {
     "cloudflare": {
-      "accountId": "",
-      "zoneId": "",
-      "turnstile": false,
+      "turnstile": true,
       "analytics": false
     },
     "resend": {

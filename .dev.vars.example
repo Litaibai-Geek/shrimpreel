@@ -20,7 +20,7 @@ NANOAPI_API_KEY=
 KIE_API_KEY=
 # 图片审核（MODERATION_PROVIDER=openai 时必填）
 OPENAI_API_KEY=
-# Turnstile（vars.TURNSTILE_SITE_KEY 非空时必填）
+# Turnstile（vars.TURNSTILE_SITE_KEY 非空时必填；运行 npm run setup -- --apply 自动填入）
 TURNSTILE_SECRET_KEY=
 # 付款即时通知（可选）：Telegram / 飞书 / Discord / Slack 的 webhook 地址，见 docs/env.md
 PAYMENT_NOTIFY_WEBHOOK_URL=

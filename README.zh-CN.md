@@ -10,6 +10,10 @@ https://github.com/user-attachments/assets/895aab94-d0c9-474e-8d90-61a6c551e536
 
 72 秒功能介绍，无声（[英文版](README.md)；MP4 文件在 [docs/media](docs/media)）。画面来自本地运行，示例站 Neon Shuffle AI 和视频素材都是占位演示。
 
+示例视频默认静音播放，可通过每个视频上的按钮单独打开或关闭声音，并在支持的浏览器中全屏观看。
+
+站点公开配置在 `site.setup.json` 中管理，由初始化脚本写入 `wrangler.jsonc`；部署前会检查配置是否同步，不会用运行密钥文件覆盖公开配置。
+
 ## 用 ShrimpReel 做的站
 
 <a href="https://christmasdanceai.com/?utm_source=github&utm_medium=referral&utm_campaign=shrimpreel"><img src="docs/media/showcase-christmas-dance-ai.jpg" width="600" alt="Christmas Dance AI：一张照片生成精灵舞或圣诞派对舞视频"></a>
@@ -428,6 +432,8 @@ e2e 覆盖（70 个用例）：
 产物在 `.tmp/video-template-e2e/`：`report/`（HTML 报告，含每步截图和 trace）、`results.json`、`test-results/`。
 
 ## 目录
+
+新站脚本会在文件不存在时创建 setup 和本地生产密钥文件、生成会话密钥，并在站点身份变化时清理旧站的支付和 Turnstile 配置。在 `site.setup.json` 选择视频服务商、审核服务商、发件地址及邮箱登录开关，初始化会写入 `wrangler.jsonc`；邮箱登录需要先完成迁移和真实投递验证。平台管理凭据和运行密钥分别放在各自文件。初始化可从现有 Zone 自动发现 Cloudflare 账户和 Zone ID；离线计划不联网。详见 [bootstrap-site.md](docs/bootstrap-site.md) 和 [bootstrap-v2.md](docs/bootstrap-v2.md)。
 
 ```text
 src/config/site.ts      每个词要改的配置

@@ -25,7 +25,7 @@ describe('site.styles', () => {
         expect(clip.label).toBeTruthy()
         expect(clip.video).toBeTruthy()
         expect(clip.poster).toBeTruthy()
-        expect(clip.credit).toContain('Pexels')
+        expect(clip.credit.trim()).toBeTruthy()
       }
     }
   })

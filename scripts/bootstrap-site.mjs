@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import ts from 'typescript'
 import { site } from '../src/config/site.ts'
 import { parseDotenv } from './sync-secrets.mjs'
+import { parsePendingMigrations, parseSecretNames } from './doctor.mjs'
 
 const WRANGLER = fileURLToPath(new URL('../node_modules/wrangler/bin/wrangler.js', import.meta.url))
 const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i
@@ -61,16 +62,42 @@ export function validateSetup(setup, wrangler, siteDomain = site.domain) {
     throw new Error('Waffo product setup requires a store ID (STO_...) and test/prod environment')
   }
   if (s.adminEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.adminEmail)) throw new Error('Invalid admin email')
+  const video = setup.video?.provider
+  if (video !== undefined && !['fal', 'yir', 'nanoapi', 'kie'].includes(video)) throw new Error('video.provider must be fal, yir, nanoapi or kie')
+  const moderation = setup.moderation?.provider
+  if (moderation !== undefined && !['openai', 'none'].includes(moderation)) throw new Error('moderation.provider must be openai or none')
+  const from = setup.email?.from
+  if (from != null && (typeof from !== 'string' || (from !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(from)))) throw new Error('Invalid email.from')
+  if (setup.email?.loginEnabled !== undefined && typeof setup.email.loginEnabled !== 'boolean') throw new Error('email.loginEnabled must be true or false')
   return { database: resources.database_name, bucket: bucket.bucket_name,
     namespace: s.name + '-kv', queue: queue.queue,
     dlq: wrangler.queues.consumers.find((q) => q.queue === queue.queue).dead_letter_queue }
 }
 
+// 站点身份以现有站点配置为准；旧版显式字段仍会校验，避免静默部署到错误站点。
+export function normalizeSetup(setup, wrangler, siteDomain = site.domain) {
+  return { ...setup, site: { ...setup.site, name: setup.site?.name || wrangler.name,
+    domain: setup.site?.domain || siteDomain } }
+}
+
 export function updatePublicVar(source, key, value) {
-  const regex = new RegExp('("' + key + '"\\s*:\\s*)"[^"]*"', 'g')
-  const hits = [...source.matchAll(regex)]
-  if (hits.length !== 1) throw new Error('Expected exactly one ' + key + ' field')
-  return source.replace(regex, (_, prefix) => prefix + JSON.stringify(value))
+  const file = ts.parseJsonText('wrangler.jsonc', source)
+  if (file.parseDiagnostics.length) throw new Error('Invalid wrangler.jsonc')
+  const root = file.statements[0]?.expression
+  if (!root || !ts.isObjectLiteralExpression(root)) throw new Error('Invalid wrangler.jsonc')
+  const vars = root.properties.filter((p) => ts.isPropertyAssignment(p) && p.name.text === 'vars')
+  if (vars.length !== 1 || !ts.isObjectLiteralExpression(vars[0].initializer)) throw new Error('Expected exactly one vars object')
+  const object = vars[0].initializer
+  const hits = object.properties.filter((p) => ts.isPropertyAssignment(p) && p.name.text === key)
+  if (hits.length > 1) throw new Error('Duplicate var: ' + key)
+  if (hits.length === 1) {
+    const current = hits[0].initializer
+    if (!ts.isStringLiteral(current)) throw new Error('Expected string var: ' + key)
+    return source.slice(0, current.getStart(file)) + JSON.stringify(value) + source.slice(current.end)
+  }
+  const at = object.getStart(file) + 1
+  const newline = source.includes('\r\n') ? '\r\n' : '\n'
+  return source.slice(0, at) + newline + '    ' + JSON.stringify(key) + ': ' + JSON.stringify(value) + (object.properties.length ? ',' : '') + source.slice(at)
 }
 
 export function updateResourceId(source, kind, id) {
@@ -87,6 +114,12 @@ function parsedConfig(text) {
   const parsed = ts.parseConfigFileTextToJson('wrangler.jsonc', text)
   if (parsed.error) throw new Error('Invalid wrangler.jsonc')
   return parsed.config
+}
+
+function changedVars(original, draft) {
+  const currentVars = parsedConfig(original).vars ?? {}
+  const expectedVars = parsedConfig(draft).vars ?? {}
+  return Object.keys(expectedVars).filter((key) => expectedVars[key] !== currentVars[key])
 }
 
 function findNamed(rows, name, key) {
@@ -181,8 +214,8 @@ export function planDescription(setup, config) {
   return [
     'Cloudflare: D1 ' + names.d1 + ', R2 ' + names.bucket + ', KV ' + names.kv,
     'Queues: ' + names.queues.join(', '),
-    'Worker vars: SITE_URL, ADMIN_EMAILS, GOOGLE_CLIENT_ID, Waffo configuration',
-    'Waffo 商品: ' + (setup.payment?.createProducts ? '创建缺失商品（test/prod）' : '跳过（可在配置中开启）'),
+    'Worker vars: SITE_URL, ADMIN_EMAILS, GOOGLE_CLIENT_ID, 支付、视频、审核和发信配置',
+    'Waffo 商品: ' + (setup.payment?.createProducts ? '创建缺失商品（' + setup.payment.environment + '）' : '跳过（可在配置中开启）'),
     'Secrets: ' + (setup.secrets?.sync ? '尝试安全同步，不覆盖线上已有密钥' : '跳过'),
     'D1 migration: only with --with-migrations; deploy: never',
   ]
@@ -196,9 +229,18 @@ export function patchPublicVars(text, setup) {
     ...(setup.payment?.provider ? { PAYMENT_PROVIDER: setup.payment.provider } : {}),
     ...(setup.payment?.environment ? { WAFFO_ENVIRONMENT: setup.payment.environment } : {}),
     ...(setup.payment?.storeId ? { WAFFO_STORE_ID: setup.payment.storeId } : {}),
+    ...(setup.video?.provider ? { VIDEO_PROVIDER: setup.video.provider } : {}),
+    ...(setup.moderation?.provider ? { MODERATION_PROVIDER: setup.moderation.provider } : {}),
+    ...(typeof setup.email?.from === 'string' ? { EMAIL_FROM: setup.email.from } : {}),
+    ...(typeof setup.email?.loginEnabled === 'boolean' ? { EMAIL_LOGIN_ENABLED: String(setup.email.loginEnabled) } : {}),
     ...(setup.turnstile?.siteKey ? { TURNSTILE_SITE_KEY: setup.turnstile.siteKey } : {}),
   }
-  return Object.entries(vars).reduce((source, [key, value]) => updatePublicVar(source, key, value), text)
+  let result = Object.entries(vars).reduce((source, [key, value]) => updatePublicVar(source, key, value), text)
+  // 商品映射在首次自动创建商品之前必须存在，避免创建成功后无法写回。
+  if (setup.payment?.createProducts && !Object.hasOwn(parsedConfig(result).vars ?? {}, 'WAFFO_PRODUCTS')) {
+    result = updatePublicVar(result, 'WAFFO_PRODUCTS', '{}')
+  }
+  return result
 }
 
 function argsForMain(argv) {
@@ -217,6 +259,7 @@ function argsForMain(argv) {
     wranglerFile: value('--wrangler', 'wrangler.jsonc'),
     withMigrations: argv.includes('--with-migrations'),
     allowLivePayments: argv.includes('--allow-live-payments'),
+    emailLoginTested: argv.includes('--email-login-tested'),
   }
 }
 
@@ -229,8 +272,8 @@ export function main(argv = process.argv.slice(2), deps = {}) {
   let options
   try {
     options = argsForMain(argv)
-    const setup = JSON.parse(read(options.setupFile))
     const original = read(options.wranglerFile)
+    const setup = normalizeSetup(JSON.parse(read(options.setupFile)), parsedConfig(original))
     validateSetup(setup, parsedConfig(original))
     const secretsPath = setup.secrets?.file || '.dev.vars.production'
     if ((setup.secrets?.sync || setup.payment?.createProducts) && !safeSecretPath(secretsPath)) {
@@ -243,11 +286,50 @@ export function main(argv = process.argv.slice(2), deps = {}) {
       if (setup.platforms?.cloudflare?.turnstile || setup.platforms?.cloudflare?.analytics || setup.platforms?.resend?.enabled) {
         log('  · V2: Turnstile / Web Analytics / Resend 按配置创建（--apply 时）')
       }
-      if (original !== draft) log('  · wrangler.jsonc: 有待更新的公开配置字段')
+      if (original !== draft) log('  · 待更新的公开配置: ' + changedVars(original, draft).join(', '))
       return 0
     }
     if (options.mode === 'apply' && setup.payment?.createProducts && setup.payment.environment === 'prod' && !options.allowLivePayments) {
       throw new Error('Creating live Waffo products requires --allow-live-payments')
+    }
+    if (options.mode === 'verify' && original !== draft) {
+      throw new Error('配置尚未同步到 ' + options.wranglerFile + ': ' + changedVars(original, draft).join(', ') + '；请检查计划并执行 --apply')
+    }
+    if (options.mode === 'apply') {
+      const platforms = setup.platforms ?? {}
+      const cloudflare = platforms.cloudflare ?? {}
+      const resend = platforms.resend ?? {}
+      if ((setup.secrets?.sync || setup.payment?.createProducts || cloudflare.turnstile || cloudflare.analytics || resend.enabled) && !existsSync(secretsPath)) {
+        throw new Error('Create the local runtime secrets file before initialization')
+      }
+      if (cloudflare.turnstile || cloudflare.analytics || resend.enabled) {
+        if (!existsSync('.dev.vars.platform')) throw new Error('Create .dev.vars.platform and configure platform credentials first')
+        const parsed = parseDotenv(read('.dev.vars.platform'))
+        if (parsed.errors.length) throw new Error('Invalid platform credentials file')
+        const env = Object.fromEntries(parsed.entries)
+        if ((cloudflare.turnstile || cloudflare.analytics || (resend.enabled && resend.dns)) && !env.CLOUDFLARE_API_TOKEN) throw new Error('Missing Cloudflare platform token')
+        if (resend.enabled && !env.RESEND_ADMIN_API_KEY) throw new Error('Missing Resend administrator key')
+      }
+      if (setup.payment?.createProducts) {
+        if (!existsSync(secretsPath)) throw new Error('Waffo needs a local secrets file')
+        const parsed = parseDotenv(read(secretsPath))
+        if (parsed.errors.length) throw new Error('Invalid local secrets file; check its lines')
+        const env = Object.fromEntries(parsed.entries)
+        if (!env.WAFFO_MERCHANT_ID || !env.WAFFO_PRIVATE_KEY) throw new Error('Missing Waffo merchant ID/private key')
+      }
+      // 正式开启前先核对真实发信、远端密钥和迁移；失败时不修改配置。
+      const currentVars = parsedConfig(original).vars ?? {}
+      if (setup.email?.loginEnabled === true && currentVars.EMAIL_LOGIN_ENABLED !== 'true') {
+        if (!options.emailLoginTested) throw new Error('邮箱登录尚未启用：请先验证发信域名、Turnstile 和真实邮件投递，完成后使用 --email-login-tested')
+        const vars = parsedConfig(draft).vars ?? {}
+        if (!vars.EMAIL_FROM || !vars.TURNSTILE_SITE_KEY) throw new Error('邮箱登录需要已验证的 EMAIL_FROM 和 TURNSTILE_SITE_KEY')
+        const migrations = runWrangler(['d1', 'migrations', 'list', 'DB', '--remote'])
+        const pending = migrations.ok ? parsePendingMigrations(migrations.output) : null
+        if (pending === null || pending.length) throw new Error('请先确认远端 D1 已应用全部迁移，再启用邮箱登录')
+        const result = runWrangler(['secret', 'list', '--format', 'json'])
+        const names = result.ok ? parseSecretNames(result.output) : null
+        if (!names || !['SESSION_SECRET', 'TURNSTILE_SECRET_KEY'].every((name) => names.includes(name))) throw new Error('远端 Worker 缺少邮箱登录所需的 SESSION_SECRET 或 TURNSTILE_SECRET_KEY')
+      }
     }
     const runner = (args) => runWrangler(args)
     let lastSaved = original
@@ -278,7 +360,7 @@ export function main(argv = process.argv.slice(2), deps = {}) {
       const platforms = setup.platforms ?? {}
       const enabled = Boolean(platforms.cloudflare?.turnstile || platforms.cloudflare?.analytics || platforms.resend?.enabled)
       if (enabled) {
-        const result = runNode(['scripts/bootstrap-platforms.mjs', '--apply'])
+        const result = runNode(['scripts/bootstrap-platforms.mjs', '--apply', '--config', options.setupFile, '--wrangler', options.wranglerFile])
         if (!result.ok) throw new Error('V2 platform provisioning failed; inspect with npm run setup:platforms -- --verify')
         updated = read(options.wranglerFile)
         log('跨平台 V2 资源已处理（未部署）')

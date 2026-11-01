@@ -10,6 +10,10 @@ https://github.com/user-attachments/assets/ce92074a-2a09-4a3e-b750-4b888d12abf8
 
 A 72-second tour, no sound ([Chinese version](README.zh-CN.md); MP4 files in [docs/media](docs/media)). Screens are from a local run; the demo site "Neon Shuffle AI" and its clips are placeholders.
 
+Preview videos play muted by default; use each video's controls to turn sound on or off and enter fullscreen where supported.
+
+Public site settings are managed in `site.setup.json` and written to `wrangler.jsonc` by setup. Deploy checks for unsynchronized settings instead of overwriting them from the runtime secrets file.
+
 ## Built with ShrimpReel
 
 <a href="https://christmasdanceai.com/?utm_source=github&utm_medium=referral&utm_campaign=shrimpreel"><img src="docs/media/showcase-christmas-dance-ai.jpg" width="600" alt="Christmas Dance AI: one photo turned into an elf dance or a Christmas party dance video"></a>
@@ -39,7 +43,7 @@ Release notes: [CHANGELOG.md](CHANGELOG.md). Feature notes and plans: [docs/SAAS
 
 ## Google and email sign-in
 
-Google sign-in remains unchanged. Optional email OTP sign-in is guarded by `EMAIL_LOGIN_ENABLED=false` until migration `0016_email_login.sql` and verified sending/Turnstile are ready. Legacy Google users must opt in from Settings using their existing session; an OTP alone never links an old Google account. See [environment setup](docs/env.md).
+Google sign-in remains unchanged. Set `email.loginEnabled` in `site.setup.json` to enable optional email OTP sign-in after migration `0016_email_login.sql`, Turnstile and real email delivery have been verified. Legacy Google users must opt in from Settings using their existing session; an OTP alone never links an old Google account. See [environment setup](docs/env.md).
 
 ## Fast Cloudflare setup for a new site
 
@@ -453,6 +457,8 @@ e2e coverage (70 tests):
 Artifacts go to `.tmp/video-template-e2e/`: `report/` (HTML report with screenshots and traces for every step), `results.json` and `test-results/`.
 
 ## Project layout
+
+The new-site script creates missing setup and local production-secret files, generates a session secret, and clears old site-specific payment and Turnstile settings when the site identity changes. Set the public video provider, moderation provider and sender in `site.setup.json`; setup writes them to `wrangler.jsonc`, while platform credentials and runtime secrets stay in their separate files. Setup can discover Cloudflare account and zone IDs from an existing zone. Offline plans make no network calls. See [bootstrap-site.md](docs/bootstrap-site.md) and [bootstrap-v2.md](docs/bootstrap-v2.md).
 
 ```text
 src/config/site.ts      per-site config

@@ -12,7 +12,9 @@ Only store site runtime secrets (such as TURNSTILE_SECRET_KEY and a Resend sendi
 Never copy platform administrator credentials into a Worker or Git.
 
 ## Configure site.setup.json platforms
-Copy site.setup.example.json to site.setup.json. Configure platforms.cloudflare.accountId, zoneId, turnstile and analytics.
+将 site.setup.example.json 复制为 site.setup.json，或由 new-site 脚本在文件不存在时创建。站点域名默认读取 src/config/site.ts；按需开启 Turnstile、Analytics 和 Resend DNS。Cloudflare accountId、zoneId 和 Turnstile Site Key 可省略。开启相关功能时，脚本使用平台 Token 按站点域名查找已有 Zone，必要时逐级查找父域，从唯一匹配的 Zone 获取两个 ID。Token 至少需要读取该 Zone 的权限，其他操作还需要各自的权限。
+
+`--plan` 仍完全离线；`--apply` 在平台步骤成功后将发现的 ID 写回所选 setup 文件；`--verify` 只读取，不保存。已有 ID 与发现的 Zone 冲突、匹配不唯一、Zone 不存在或不可访问时会停止；不会创建 Zone、切换域名服务器，也不会猜测账户。请确保 Wrangler 登录使用同一个 Cloudflare 账户。`--config` 和 `--wrangler` 自定义路径会传给平台步骤，运行密钥文件使用 setup 中的 `secrets.file`。
 Configure platforms.resend.enabled, dns, allowMx and createSendingKey. MX changes are opt-in and existing DNS conflicts are never overwritten.
 
 ## Run commands

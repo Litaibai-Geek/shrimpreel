@@ -121,8 +121,18 @@ export function main(args, { wrangler = runWrangler, gitIgnored = isGitIgnored, 
   const parsed = parseDotenv(readFileSync(file, 'utf8'))
   const list = wrangler(['secret', 'list', '--format', 'json', '-c', configFile])
   const remoteNames = list.ok ? parseSecretNames(list.output) : null
-  const plan = planSecrets({ entries: parsed.entries, example: readFileSync(EXAMPLE_FILE, 'utf8'), remoteNames, config, overwrite })
-  const errors = [...parsed.errors, ...plan.errors]
+  const example = readFileSync(EXAMPLE_FILE, 'utf8')
+  const known = exampleSecrets(example)
+  // 未使用的服务可留空；未知键仍保留用于报错，避免拼错后被静默忽略。
+  const entries = parsed.entries.filter(([name, value]) => value.trim() || !known.has(name))
+  const plan = planSecrets({ entries, example, remoteNames, config, overwrite })
+  const seen = new Set()
+  const duplicates = []
+  for (const [name] of parsed.entries) {
+    if (seen.has(name)) duplicates.push(`${name} 重复出现`)
+    seen.add(name)
+  }
+  const errors = [...new Set([...parsed.errors, ...plan.errors, ...duplicates])]
 
   log(`同步密钥：${file} → Worker ${config.name}（${configFile}，APP_ENV=${config.vars?.APP_ENV ?? '(空)'}）`)
   log(remoteNames ? `远端已有 ${remoteNames.length} 个 secret` : '读不到远端 secret 列表：未登录 wrangler，或 Worker 还不存在')

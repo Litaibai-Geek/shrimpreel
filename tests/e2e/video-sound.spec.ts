@@ -1,0 +1,20 @@
+import { expect, test } from '@playwright/test'
+
+test('示例视频默认静音且可单独切换声音', async ({ page }) => {
+  await page.goto('/')
+  const videos = page.locator('figure').filter({ has: page.locator('video') })
+  await expect(videos).toHaveCount(3)
+  const first = videos.nth(0)
+  const second = videos.nth(1)
+  await expect(first.locator('video')).toHaveJSProperty('muted', true)
+  await expect(second.locator('video')).toHaveJSProperty('muted', true)
+  await first.getByRole('button', { name: 'Turn sound on' }).click()
+  await expect(first.locator('video')).toHaveJSProperty('muted', false)
+  await expect(second.locator('video')).toHaveJSProperty('muted', true)
+  await first.getByRole('button', { name: 'Mute sound' }).click()
+  await expect(first.locator('video')).toHaveJSProperty('muted', true)
+  await first.getByRole('button', { name: 'Enter fullscreen' }).click()
+  await expect(first.getByRole('button', { name: 'Exit fullscreen' })).toBeVisible()
+  await first.getByRole('button', { name: 'Exit fullscreen' }).click()
+  await expect(first.getByRole('button', { name: 'Enter fullscreen' })).toBeVisible()
+})
