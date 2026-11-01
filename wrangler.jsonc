@@ -30,7 +30,7 @@
     "WAFFO_ENVIRONMENT": "prod",
     // Waffo 店铺 ID（STO_xxx，公开）：由站点初始化从 site.setup.json 同步
     "WAFFO_STORE_ID": "STO_6D4bDDFAtedVjWKXT9N6G8",
-    "WAFFO_PRODUCTS": "{\"starter\":\"PROD_3FRj2nVu7H15wfbuObBPk7\",\"party\":\"PROD_6gzuUs1tVMK6Us4Fe8jS7J\",\"squad\":\"PROD_3e8emyTLtxYCvQMA5uBwVE\"}",
+    "WAFFO_PRODUCTS": "{\"starter\":\"PROD_3FRj2nVu7H15wfbuObBPk7\",\"party\":\"PROD_6gzuUs1tVMK6Us4Fe8jS7J\",\"squad\":\"PROD_3e8emyTLtxYCvQMA5uBwVE\",\"admin_payment_test\":\"PROD_20E6w6Q5ihPJ4bFB81DOL4\"}",
     "DODO_ENVIRONMENT": "test",
     // 每个积分包、订阅套餐对应支付商的 product id（JSON：{"starter":"PROD_xxx","monthly":"PROD_yyy",...}）
     // WAFFO_PRODUCTS 可由站点初始化创建商品后写入

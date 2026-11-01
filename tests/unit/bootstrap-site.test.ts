@@ -3,7 +3,7 @@ import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import {
   ensureCloudflare, main, parseList, patchPublicVars, planDescription,
-  updatePublicVar, updateResourceId, validateSetup, normalizeSetup,
+  updatePublicVar, updateResourceId, validateSetup, normalizeSetup, patchTestPayment,
 } from '../../scripts/bootstrap-site.mjs'
 import { checkPublicConfig } from '../../scripts/pre-deploy.mjs'
 
@@ -18,6 +18,19 @@ const setup = {
 }
 const d1Id = '11111111-2222-4333-8444-555555555555'
 const kvId = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+
+describe('测试支付配置', () => {
+  it('同步开关并拒绝不完整或重复的站点配置', () => {
+    expect(patchTestPayment('testPaymentEnabled: false as boolean,', true)).toBe('testPaymentEnabled: true as boolean,')
+    expect(patchTestPayment('testPaymentEnabled: true as boolean,', false)).toBe('testPaymentEnabled: false as boolean,')
+    expect(() => patchTestPayment('', true)).toThrow()
+    expect(() => patchTestPayment('testPaymentEnabled: false as boolean, testPaymentEnabled: true as boolean', true)).toThrow()
+  })
+  it('能从 Wrangler 带 ANSI 警告的输出中读取资源数组', () => {
+    expect(parseList('[{"name":"db"}]\n\x1b[33m[WARNING]\x1b[0m proxy')).toEqual([{ name: 'db' }])
+    expect(parseList('\x1b[33m[WARNING]\x1b[0m proxy\n[{"name":"db"}]')).toEqual([{ name: 'db' }])
+  })
+})
 
 function simulatedCloudflare() {
   const state = {

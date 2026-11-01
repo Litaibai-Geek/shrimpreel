@@ -45,6 +45,14 @@ const plan = site.packages.map((pkg) => ({
     metadata: { packageId: pkg.id, credits: String(pkg.credits), site: site.domain },
   },
 }))
+if (args['test-payment']) plan.push({
+  packageId: 'admin_payment_test',
+  skip: Boolean(existing.admin_payment_test),
+  body: { storeId, name: `${site.brandName} · admin payment test`,
+    description: 'Administrator payment test: 100 credits.',
+    prices: { USD: { amount: '0.01', taxIncluded: false, taxCategory: 'saas' } },
+    metadata: { packageId: 'admin_payment_test', credits: '100', site: site.domain } },
+})
 // 订阅商品不设试用价 https://docs.waffo.ai/api-reference/endpoints/subscription-products/create-product
 for (const sub of sellingPlans) {
   plan.push({
@@ -80,7 +88,9 @@ if (!merchantId) fail('缺少 WAFFO_MERCHANT_ID')
 const products = { ...existing }
 for (const item of plan) {
   if (item.skip) continue
-  const data = await signedPost(item.path ?? '/v1/actions/onetime-product/create-product', item.body)
+  const hash = item.packageId === 'admin_payment_test' ? createHash('sha256').update(`admin-payment-test:${storeId}:${site.domain}`).digest('hex') : ''
+  const key = hash ? `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}` : undefined
+  const data = await signedPost(item.path ?? '/v1/actions/onetime-product/create-product', item.body, key)
   products[item.packageId] = data.product.id
   console.log(`created ${item.packageId} → ${data.product.id} (${data.product.status})`)
 }
@@ -112,7 +122,7 @@ if (args['write-dev-vars']) {
 
 // ---------- helpers ----------
 
-async function signedPost(path, body) {
+async function signedPost(path, body, idempotencyKey = randomUUID()) {
   const bodyText = JSON.stringify(body)
   const timestamp = String(Math.floor(Date.now() / 1000))
   const bodyHash = createHash('sha256').update(bodyText).digest('base64')
@@ -124,7 +134,7 @@ async function signedPost(path, body) {
       'X-Merchant-Id': merchantId,
       'X-Timestamp': timestamp,
       'X-Signature': signature,
-      'X-Idempotency-Key': randomUUID(),
+      'X-Idempotency-Key': idempotencyKey,
     },
     body: bodyText,
   })

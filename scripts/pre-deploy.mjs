@@ -3,7 +3,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import ts from 'typescript'
-import { normalizeSetup, patchPublicVars, validateSetup } from './bootstrap-site.mjs'
+import { normalizeSetup, patchPublicVars, patchTestPayment, validateSetup } from './bootstrap-site.mjs'
 import { parseDotenv } from './sync-secrets.mjs'
 
 export function syncGa4Config(siteCode, envText) {
@@ -33,11 +33,16 @@ export function checkPublicConfig(wrangler, setup) {
 
 export function main() {
   try {
-    const pending = checkPublicConfig(readFileSync('wrangler.jsonc', 'utf8'), JSON.parse(readFileSync('site.setup.json', 'utf8')))
+    const setup = JSON.parse(readFileSync('site.setup.json', 'utf8'))
+    const pending = checkPublicConfig(readFileSync('wrangler.jsonc', 'utf8'), setup)
     if (pending.length) {
       console.error('站点配置尚未同步到 wrangler.jsonc：' + pending.join('、'))
       console.error('请先运行 npm run setup -- --plan，核对后执行初始化。')
       return 1
+    }
+    if (setup.payment?.testPackageEnabled !== undefined) {
+      const code = readFileSync('src/config/site.ts', 'utf8')
+      if (patchTestPayment(code, setup.payment.testPackageEnabled) !== code) throw new Error('测试支付开关尚未同步，请先运行 npm run setup -- --apply')
     }
     if (existsSync('.dev.vars.production')) {
       const path = 'src/config/site.ts'

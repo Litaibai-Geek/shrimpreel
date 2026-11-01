@@ -22,6 +22,8 @@ The launch commands are `npm run setup -- --apply`, `npm run db:migrate:remote`,
 
 邮件收件转发可在 `site.setup.json` 的 `email.routing` 中启用并设置 `destination`；来源默认为 `site.adminEmail`，也可设置 `source`。目标邮箱首次验证后，重新运行 `npm run setup -- --apply` 完成转发配置。Cloudflare Token 需要邮件路由地址、规则和 Zone 设置的读写权限；已有其他服务商的 MX 或冲突规则时会停止。配置完成后需实际验证收件。
 
+真实支付测试可在 `site.setup.json` 的 `payment` 中设置 `testPackageEnabled: true` 与 `createProducts: true`，执行 `npm run setup -- --apply` 和 `npm run deploy`，再从管理员后台运营设置发起 $0.01 / 100 积分的真实 Waffo 支付。测试后将开关改为 `false` 并重跑两条命令可关闭新下单；Waffo 商品需在后台另行停用。保留商品映射和订单以处理延迟回调。
+
 Setup saves newly created Resend sending keys immediately. If an existing key cannot be recovered locally, setup creates a replacement without deleting the old key; existing Worker secrets are not overwritten.
 
 ## Built with ShrimpReel

@@ -9,7 +9,8 @@
     "provider": "waffo",
     "environment": "test",
     "storeId": "",
-    "createProducts": false
+    "createProducts": false,
+    "testPackageEnabled": false
   },
   "video": {
     "provider": "kie"

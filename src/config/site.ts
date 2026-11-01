@@ -21,6 +21,8 @@ export const site = {
   logoMark: 'TD',
   domain: 'tinydeskai.website',
   supportEmail: 'support@tinydeskai.website',
+  // 仅供管理员测试真实收款，由 site.setup.json 的开关同步。
+  testPaymentEnabled: true as boolean,
   // 社媒平台名称（用于 “Viral on TikTok” 之类标签）
   trendPlatform: 'TikTok',
   ogImage: '/og.png',

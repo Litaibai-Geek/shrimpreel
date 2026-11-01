@@ -1,11 +1,23 @@
 import { expect, test } from '@playwright/test'
 import { buyPackage, clawbackCredits, credits, devLogin, durationCredits, json, ledger, pkg, post, uniqueEmail, uploadPhoto } from './helpers'
+import { site } from '../../src/config/site'
 
 const STARTER = pkg('starter').credits
 const PARTY = pkg('party')
 
 type Result = { status: 'processed' | 'duplicate' | 'ignored' | 'orphan' | 'mismatch'; note?: string }
 type HealthCheck = { stats: { paymentReview: { count: number; latest: string | null } }; alerts: Array<{ kind: string; count: number }> }
+
+test('管理员测试套餐禁止普通用户购买且不会通过 mock 服务商创建订单', async ({ request }) => {
+  await devLogin(request, uniqueEmail('test-pack-user'))
+  const denied = await post(request, '/api/checkout', { packageId: 'admin_payment_test', locale: 'en' })
+  expect(denied.status()).toBe(400)
+  expect((await denied.json()).error).toBe('invalid_package')
+  await devLogin(request, 'admin@example.com')
+  const admin = await post(request, '/api/checkout', { packageId: 'admin_payment_test', locale: 'zh' })
+  expect(admin.status()).toBe(site.testPaymentEnabled ? 503 : 400)
+  expect((await admin.json()).error).toBe(site.testPaymentEnabled ? 'payment_not_configured' : 'invalid_package')
+})
 
 test('并发、重放、退款后迟到的支付事件：积分只入账一次、只回收一次', async ({ request }) => {
   await devLogin(request, uniqueEmail('idem'))

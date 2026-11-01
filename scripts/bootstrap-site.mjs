@@ -24,15 +24,25 @@ function runChild(file, args, env) {
 }
 
 export function parseList(text) {
-  // Wrangler sometimes emits an update notice before its JSON response.
-  const start = text.indexOf('[')
-  const end = text.lastIndexOf(']')
-  if (start < 0 || end < start) throw new Error('Wrangler did not return a JSON list')
-  let json
-  try { json = JSON.parse(text.slice(start, end + 1)) }
-  catch { throw new Error('Wrangler returned an unreadable JSON list') }
-  if (!Array.isArray(json)) throw new Error('Expected a JSON array')
-  return json
+  // 输出可能包含位于 JSON 前后的 ANSI 警告，不能使用最后一个右方括号截取。
+  const clean = text.replace(/\x1b\[[0-9;]*m/g, '')
+  for (let start = clean.indexOf('['); start >= 0; start = clean.indexOf('[', start + 1)) {
+    let depth = 0, quoted = false, escaped = false
+    for (let i = start; i < clean.length; i++) {
+      const ch = clean[i]
+      if (quoted) {
+        if (escaped) escaped = false
+        else if (ch === '\\') escaped = true
+        else if (ch === '"') quoted = false
+      } else if (ch === '"') quoted = true
+      else if (ch === '[') depth++
+      else if (ch === ']' && --depth === 0) {
+        try { const result = JSON.parse(clean.slice(start, i + 1)); if (Array.isArray(result)) return result } catch {}
+        break
+      }
+    }
+  }
+  throw new Error('Wrangler returned an unreadable JSON list')
 }
 
 export function validateSetup(setup, wrangler, siteDomain = site.domain) {
@@ -57,6 +67,8 @@ export function validateSetup(setup, wrangler, siteDomain = site.domain) {
     throw new Error('The video queue needs a dead-letter queue')
   }
   const payment = setup.payment ?? {}
+  if (payment.testPackageEnabled !== undefined && typeof payment.testPackageEnabled !== 'boolean') throw new Error('payment.testPackageEnabled must be true or false')
+  if (payment.testPackageEnabled && (!payment.createProducts || payment.provider !== 'waffo')) throw new Error('测试套餐需要启用 Waffo 商品创建')
   if (payment.provider && payment.provider !== 'waffo') throw new Error('V1 payment automation supports Waffo only')
   if (payment.createProducts && (!/^STO_[A-Za-z0-9_-]+$/.test(payment.storeId ?? '') || !['test','prod'].includes(payment.environment))) {
     throw new Error('Waffo product setup requires a store ID (STO_...) and test/prod environment')
@@ -78,6 +90,12 @@ export function validateSetup(setup, wrangler, siteDomain = site.domain) {
 export function normalizeSetup(setup, wrangler, siteDomain = site.domain) {
   return { ...setup, site: { ...setup.site, name: setup.site?.name || wrangler.name,
     domain: setup.site?.domain || siteDomain } }
+}
+
+export function patchTestPayment(source, enabled) {
+  const pattern = /(\btestPaymentEnabled:\s*)(?:true|false)(?=\s+as boolean)/g
+  if ([...source.matchAll(pattern)].length !== 1) throw new Error('站点测试支付配置缺失或重复')
+  return source.replace(pattern, (_, prefix) => prefix + String(enabled))
 }
 
 export function updatePublicVar(source, key, value) {
@@ -292,6 +310,7 @@ export function main(argv = process.argv.slice(2), deps = {}) {
         log('  · V2: Turnstile / Web Analytics / Resend 按配置创建（--apply 时）')
       }
       if (setup.email?.routing?.enabled) log('  · 邮件转发：验证目标邮箱后配置 Cloudflare 邮件路由')
+      if (setup.payment?.testPackageEnabled) log('  · 管理员支付测试商品：$0.01 / 100 积分')
       if (original !== draft) log('  · 待更新的公开配置: ' + changedVars(original, draft).join(', '))
       return 0
     }
@@ -389,6 +408,7 @@ export function main(argv = process.argv.slice(2), deps = {}) {
         const vars = parsedConfig(updated).vars
         const env = { ...process.env, ...secretVars, WAFFO_PRODUCTS: vars.WAFFO_PRODUCTS, WAFFO_ENVIRONMENT: setup.payment.environment }
         const paymentArgs = ['scripts/waffo-setup.mjs','--store',setup.payment.storeId,'--apply']
+        if (setup.payment.testPackageEnabled) paymentArgs.push('--test-payment')
         if (setup.payment.environment === 'prod') paymentArgs.push('--prod')
         // No automatic webhook creation: the upstream script cannot yet
         // de-duplicate a partially completed add-webhook request.
@@ -403,6 +423,12 @@ export function main(argv = process.argv.slice(2), deps = {}) {
         updated = updatePublicVar(updated, 'WAFFO_PRODUCTS', JSON.stringify(products))
         save(updated)
         log('Waffo 商品映射已写入；Webhook 首次创建仍需在 Waffo 后台确认。')
+      }
+      if (setup.payment?.testPackageEnabled !== undefined) {
+        const sitePath = 'src/config/site.ts'
+        const oldSite = read(sitePath)
+        const newSite = patchTestPayment(oldSite, setup.payment.testPackageEnabled)
+        if (newSite !== oldSite) write(sitePath, newSite)
       }
       if (setup.secrets?.sync) {
         const secretFile = setup.secrets.file || '.dev.vars.production'

@@ -46,6 +46,8 @@ function AdminSettings() {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null)
   const [probes, setProbes] = useState<Record<string, ProbeResult | 'running'>>({})
+  const [testPaymentMessage, setTestPaymentMessage] = useState('')
+  const [testPaymentBusy, setTestPaymentBusy] = useState(false)
 
   useEffect(() => {
     if (data) setForm(Object.fromEntries(Object.entries(data.values).map(([key, value]) => [key, toInput(value)])))
@@ -80,6 +82,18 @@ function AdminSettings() {
       setProbes((p) => ({ ...p, [target]: result }))
     } catch (err) {
       setProbes((p) => ({ ...p, [target]: { target, provider: '', status: 'fail', message: errorCode(err), ms: 0 } }))
+    }
+  }
+
+  async function testPayment() {
+    setTestPaymentBusy(true)
+    setTestPaymentMessage('')
+    try {
+      const result = await api<{ url: string }>('/api/checkout', { json: { packageId: 'admin_payment_test', locale: 'zh' } })
+      window.location.assign(result.url)
+    } catch (err) {
+      setTestPaymentMessage(`无法创建测试订单：${errorCode(err)}。请确认测试套餐已启用并完成部署。`)
+      setTestPaymentBusy(false)
     }
   }
 
@@ -161,6 +175,12 @@ function AdminSettings() {
         </form>
       ) : null}
 
+      <section className="card space-y-3 p-5 text-sm">
+        <h2 className="font-medium">真实支付测试</h2>
+        <p className="text-xs text-muted">管理员专用，$0.01 购买 100 积分；提交后进入真实收银台，实际金额可能含税。</p>
+        <button type="button" className="btn-ghost" disabled={testPaymentBusy} onClick={() => void testPayment()}>创建测试支付订单</button>
+        {testPaymentMessage ? <p role="alert">{testPaymentMessage}</p> : null}
+      </section>
       <section className="card space-y-3 p-5 text-sm" data-testid="probes">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>

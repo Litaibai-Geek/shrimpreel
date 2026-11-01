@@ -45,6 +45,7 @@ import {
   subscriptionRef,
 } from './subscriptions'
 import { createTakedown, isBlockedMedia, parseTakedown, type TakedownInput } from './takedown'
+import { testPaymentPackage } from './test-payment'
 import { turnstileSiteKey, verifyTurnstile } from './turnstile'
 import type { AppContext, GenerationRow, OrderRow, UploadRow, UserRow } from './types'
 import { ApiError, constantTimeEqual, createId, isCheckConstraintError, isProduction, nowIso, randomToken, sha256Hex } from './util'
@@ -605,13 +606,16 @@ app.post('/api/checkout', async (c) => {
   await rateLimit(c.env.AUTH_LIMITER, `checkout:${user.id}`)
   const body = await readJson<{ packageId: string; locale: string }>(c)
   // packageId 可以是积分包或在售的订阅套餐（订阅开关关掉时套餐不能再下单）
-  const pack = findPackage(body.packageId ?? '') ?? sellingPlans.find((p) => p.id === body.packageId)
+  const testPack = testPaymentPackage(body.packageId ?? '', site.testPaymentEnabled, user.role)
+  if (body.packageId === 'admin_payment_test' && !testPack) throw new ApiError(400, 'invalid_package')
+  const pack = testPack ?? findPackage(body.packageId ?? '') ?? sellingPlans.find((p) => p.id === body.packageId)
   if (!pack) throw new ApiError(400, 'invalid_package')
   // 同一时间只允许一个订阅；已到期取消且当期结束的不算（见 LIVE_SUBSCRIPTION_SQL）
   if (findPlan(pack.id) && (await liveSubscription(c.env.DB, user.id))) throw new ApiError(409, 'subscription_exists')
   const locale = isLocale(body.locale) ? body.locale : 'en'
   await rememberLocale(c.env, user, body.locale)
   const provider = getPaymentProvider(c.env, settings.paymentProvider)
+  if (testPack && provider.id !== 'waffo') throw new ApiError(503, 'payment_not_configured')
   const id = createId('ord')
   const now = nowIso()
   const attr = requestAttribution(c, 'last')
