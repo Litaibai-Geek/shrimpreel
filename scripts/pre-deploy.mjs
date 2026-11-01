@@ -1,9 +1,23 @@
 #!/usr/bin/env node
 // 部署前核对站点配置；不从密钥文件覆盖公开变量，也不绕过初始化的保护检查。
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import ts from 'typescript'
 import { normalizeSetup, patchPublicVars, validateSetup } from './bootstrap-site.mjs'
+import { parseDotenv } from './sync-secrets.mjs'
+
+export function syncGa4Config(siteCode, envText) {
+  const parsed = parseDotenv(envText)
+  if (parsed.errors.length) throw new Error('生产配置文件格式错误')
+  const entries = parsed.entries.filter(([key]) => key === 'GA4_MEASUREMENT_ID')
+  if (entries.length > 1) throw new Error('GA4_MEASUREMENT_ID 重复配置')
+  if (!entries.length) return siteCode
+  const id = entries[0][1].trim()
+  if (id && !/^G-[A-Z0-9]+$/.test(id)) throw new Error('GA4_MEASUREMENT_ID 格式应为 G- 开头的 GA4 Measurement ID')
+  const pattern = /(\bga4Id:\s*)'[^']*'/g
+  if ([...siteCode.matchAll(pattern)].length !== 1) throw new Error('站点 GA4 配置缺失或重复')
+  return siteCode.replace(pattern, (_, prefix) => prefix + "'" + id + "'")
+}
 
 export function checkPublicConfig(wrangler, setup) {
   const parsed = ts.parseConfigFileTextToJson('wrangler.jsonc', wrangler)
@@ -24,6 +38,15 @@ export function main() {
       console.error('站点配置尚未同步到 wrangler.jsonc：' + pending.join('、'))
       console.error('请先运行 npm run setup -- --plan，核对后执行初始化。')
       return 1
+    }
+    if (existsSync('.dev.vars.production')) {
+      const path = 'src/config/site.ts'
+      const original = readFileSync(path, 'utf8')
+      const updated = syncGa4Config(original, readFileSync('.dev.vars.production', 'utf8'))
+      if (updated !== original) {
+        writeFileSync(path, updated, 'utf8')
+        console.log('GA4 站点配置已同步。')
+      }
     }
     console.log('站点公开配置已同步。')
     return 0

@@ -214,7 +214,7 @@ export const site = {
   // Umami 不写 Cookie，不受同意横幅控制。
   // 隐私政策的“Cookie 与统计”一节按这三项自动调整
   analytics: {
-    ga4Id: '',
+    ga4Id: 'G-W2Q5WH0W6Y',
     cfBeaconToken: '',
     umamiWebsiteId: '',
   },

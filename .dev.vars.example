@@ -1,4 +1,6 @@
 # 复制为 .dev.vars（本地）；生产用 `wrangler secret put <NAME>` 写入
+# GA4 Measurement ID 是公开配置，部署前写入站点配置，不同步为 Worker secret
+GA4_MEASUREMENT_ID=
 SESSION_SECRET=change-me-to-a-long-random-string
 GOOGLE_CLIENT_SECRET=
 # Waffo Pancake（默认支付）

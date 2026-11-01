@@ -12,9 +12,11 @@ A 72-second tour, no sound ([Chinese version](README.zh-CN.md); MP4 files in [do
 
 Preview videos play muted by default; use each video's controls to turn sound on or off and enter fullscreen where supported.
 
-Public site settings are managed in `site.setup.json` and written to `wrangler.jsonc` by `npm run setup -- --apply`. Setup can create a missing Cloudflare zone and show its nameservers; review and migrate DNS records before changing the registrar settings. Run database migrations next, then deploy; these commands use the Cloudflare token in `.dev.vars.platform` when no token is set in the environment. The deployment check does not overwrite public settings from the runtime secrets file.
+Public site settings are managed in `site.setup.json` and written to `wrangler.jsonc` by `npm run setup -- --apply`. Setup can create a missing Cloudflare zone and show its nameservers; review and migrate DNS records before changing the registrar settings. Run database migrations next, then deploy; these commands use the Cloudflare token in `.dev.vars.platform` when no token is set in the environment. The deployment check does not overwrite Wrangler settings from the runtime secrets file.
 
 Setup configures a permanent www-to-apex redirect using Cloudflare redirect rules, retaining the path, query string and request method. The Cloudflare token needs DNS and redirect-rule permissions.
+
+Set `GA4_MEASUREMENT_ID=G-...` in `.dev.vars.production` to enable GA4 on the next deployment. This public ID is copied to the site configuration before the build and is not uploaded as a Worker secret; an empty value disables GA4.
 
 The launch commands are `npm run setup -- --apply`, `npm run db:migrate:remote`, and `npm run deploy`, in that order. Deployment runs doctor, typecheck, unit tests and build before publishing. Back up existing production data before migrations; configure and verify external DNS, payment webhooks, reference media and email delivery separately.
 

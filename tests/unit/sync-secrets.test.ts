@@ -82,7 +82,7 @@ describe('sync-secrets', () => {
     const wranglerFile = join(dir, 'wrangler.jsonc')
     const secretsFile = join(dir, '.dev.vars.production')
     writeFileSync(wranglerFile, JSON.stringify(config))
-    writeFileSync(secretsFile, `SESSION_SECRET=${STRONG}\nFAL_KEY=fal-secret-value\nSITE_URL=https://wrong.example\nRESEND_API_KEY=\n`)
+    writeFileSync(secretsFile, `SESSION_SECRET=${STRONG}\nFAL_KEY=fal-secret-value\nSITE_URL=https://wrong.example\nGA4_MEASUREMENT_ID=G-ABC123\nRESEND_API_KEY=\n`)
 
     const run = (args: string[], { remote = '[{"name":"SESSION_SECRET","type":"secret_text"}]' as string | null, ignored = true } = {}) => {
       const calls: { args: string[]; input?: string }[] = []
@@ -105,6 +105,7 @@ describe('sync-secrets', () => {
     expect(dry.out).toContain('新增（1）：\n  FAL_KEY')
     expect(dry.out).toContain('已存在，不覆盖')
     expect(dry.out).toContain('跳过公开配置')
+    expect(dry.out).toContain('GA4_MEASUREMENT_ID')
     expect(dry.out).not.toMatch(/fal-secret-value|aaaaaaaa/)
 
     const applied = run(['--apply'])

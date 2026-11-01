@@ -18,6 +18,8 @@ import { configBindings, parseSecretNames, readWranglerConfig } from './doctor.m
 
 const EXAMPLE_FILE = fileURLToPath(new URL('../.dev.vars.example', import.meta.url))
 const WRANGLER_BIN = fileURLToPath(new URL('../node_modules/wrangler/bin/wrangler.js', import.meta.url))
+// 这是部署时写入站点配置的公开标识，不是 Worker secret。
+const LOCAL_PUBLIC_CONFIG = new Set(['GA4_MEASUREMENT_ID'])
 
 // KEY=VALUE，支持 export 前缀、成对引号和未加引号时的行尾 # 注释。报错只给行号，不带内容（可能含密钥）
 export function parseDotenv(text) {
@@ -39,7 +41,7 @@ export function parseDotenv(text) {
 
 // .dev.vars.example 登记的密钥名和占位值（注释掉的可选密钥也算）
 export function exampleSecrets(text) {
-  return new Map([...text.matchAll(/^\s*#?\s*([A-Z][A-Z0-9_]*)=(.*)$/gm)].map((m) => [m[1], m[2].trim()]))
+  return new Map([...text.matchAll(/^\s*#?\s*([A-Z][A-Z0-9_]*)=(.*)$/gm)].filter((m) => !LOCAL_PUBLIC_CONFIG.has(m[1])).map((m) => [m[1], m[2].trim()]))
 }
 
 // remoteNames：远端已有的 secret 名字，null = 读不到
@@ -128,8 +130,9 @@ export function main(args, { wrangler = runWrangler, gitIgnored = isGitIgnored, 
   const example = readFileSync(EXAMPLE_FILE, 'utf8')
   const known = exampleSecrets(example)
   // 未使用的服务可留空；未知键仍保留用于报错，避免拼错后被静默忽略。
-  const publicNames = parsed.entries.filter(([name]) => name in (config.vars ?? {})).map(([name]) => name)
-  const entries = parsed.entries.filter(([name, value]) => !(name in (config.vars ?? {})) && (value.trim() || !known.has(name)))
+  const isPublic = (name) => name in (config.vars ?? {}) || LOCAL_PUBLIC_CONFIG.has(name)
+  const publicNames = parsed.entries.filter(([name]) => isPublic(name)).map(([name]) => name)
+  const entries = parsed.entries.filter(([name, value]) => !isPublic(name) && (value.trim() || !known.has(name)))
   const plan = planSecrets({ entries, example, remoteNames, config, overwrite })
   const seen = new Set()
   const duplicates = []
