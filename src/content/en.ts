@@ -537,6 +537,7 @@ export function en(s: S) {
       file_too_large: 'That file is larger than 10 MB.',
       length_required: 'Your browser sent the file in a way we can’t accept. Please try again in another browser.',
       unsupported_file_type: 'Please upload a JPG, PNG or WebP image.',
+      image_processing_failed: 'We could not prepare this photo. Please try another image or browser.',
       invalid_upload: 'Please upload the photo again.',
       band_invalid: 'Band mode requires 2–5 distinct adult portraits. Please reselect your photos.',
       band_duplicate: 'This image is repeated. Please use a different portrait for each member.',

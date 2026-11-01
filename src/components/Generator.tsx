@@ -3,7 +3,8 @@ import { CircleAlert, CircleCheck, Download, Upload } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { STYLES, cheapestPackageCovering, defaultStyle, formatPrice, site } from '#/config/site'
 import { BAND_MAX, BAND_MIN } from '#/lib/band'
-import { api, errorCode, isActiveGeneration, type Generation } from '#/lib/api'
+import { api, ApiRequestError, errorCode, isActiveGeneration, type Generation } from '#/lib/api'
+import { preparePhoto } from '#/lib/prepare-photo'
 import { track } from '#/lib/attribution'
 import { useCheckout } from '#/lib/checkout'
 import { useContent, useLocale, useLocalePath } from '#/lib/i18n'
@@ -75,6 +76,9 @@ export function Generator({ styleId: controlledStyleId, onStyleChange }: { style
     try {
       const form = new FormData()
       form.append('file', file)
+      let prepared: File | null
+      try { prepared = await preparePhoto(file) } catch { throw new ApiRequestError(400, 'image_processing_failed') }
+      if (prepared) form.append('prepared', prepared)
       const data = await api<{ upload: { id: string } }>('/api/uploads', { form })
       return data.upload.id
     } finally {

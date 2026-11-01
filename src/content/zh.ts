@@ -515,6 +515,7 @@ export function zh(s: S): Content {
       file_too_large: '文件超过 10 MB。',
       length_required: '浏览器上传文件的方式不受支持，请换个浏览器重试。',
       unsupported_file_type: '请上传 JPG、PNG 或 WebP 图片。',
+      image_processing_failed: '无法处理这张照片，请更换图片或浏览器后重试。',
       invalid_upload: '请重新上传照片。',
       band_invalid: 'Band 模式需要 2–5 张不同成年人的照片，请重新选择。',
       band_duplicate: '检测到重复照片，请为每位乐队成员选择不同人像。',

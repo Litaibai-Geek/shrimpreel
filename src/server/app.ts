@@ -343,19 +343,26 @@ app.post('/api/uploads', async (c) => {
   // 没有 Content-Length（分块上传）时 formData() 会把整个请求体读进内存，直接拒绝；浏览器上传表单总会带长度
   const header = c.req.header('content-length')
   if (!header || !/^\d+$/.test(header)) throw new ApiError(411, 'length_required')
-  if (Number(header) > site.upload.maxBytes + 64 * 1024) throw new ApiError(413, 'file_too_large')
+  if (Number(header) > site.upload.maxBytes * 2 + 64 * 1024) throw new ApiError(413, 'file_too_large')
   const form = await c.req.raw.formData().catch(() => null)
   const file = form?.get('file')
   if (!file || typeof file === 'string') throw new ApiError(400, 'missing_file')
   if (file.size > site.upload.maxBytes) throw new ApiError(413, 'file_too_large')
-  const bytes = new Uint8Array(await file.arrayBuffer())
-  const contentType = sniffImageType(bytes)
-  if (!contentType || !(site.upload.contentTypes as readonly string[]).includes(contentType)) {
+  const original = new Uint8Array(await file.arrayBuffer())
+  const originalType = sniffImageType(original)
+  if (!originalType || !(site.upload.contentTypes as readonly string[]).includes(originalType)) {
     throw new ApiError(415, 'unsupported_file_type')
   }
+  const prepared = form?.get('prepared')
+  if (typeof prepared === 'string') throw new ApiError(400, 'invalid_upload')
+  if (prepared && prepared.size > site.upload.maxBytes) throw new ApiError(413, 'file_too_large')
+  const bytes = prepared ? new Uint8Array(await prepared.arrayBuffer()) : original
+  const contentType = sniffImageType(bytes)
+  if (!contentType || !(site.upload.contentTypes as readonly string[]).includes(contentType)) throw new ApiError(415, 'unsupported_file_type')
   // 已下架内容的原图不允许再次上传；审核不通过的不落盘、不扣积分
-  const hash = await sha256Hex(bytes)
+  const hash = await sha256Hex(original)
   if (await isBlockedMedia(c.env, hash)) throw new ApiError(422, 'content_rejected')
+  if (prepared && await isBlockedMedia(c.env, await sha256Hex(bytes))) throw new ApiError(422, 'content_rejected')
   const mockOutcome = form?.get('mockOutcome')
   const verdict = await getModerationProvider(c.env).checkImage({
     bytes,

@@ -22,6 +22,8 @@ The launch commands are `npm run setup -- --apply`, `npm run db:migrate:remote`,
 
 邮件收件转发可在 `site.setup.json` 的 `email.routing` 中启用并设置 `destination`；来源默认为 `site.adminEmail`，也可设置 `source`。目标邮箱首次验证后，重新运行 `npm run setup -- --apply` 完成转发配置。Cloudflare Token 需要邮件路由地址、规则和 Zone 设置的读写权限；已有其他服务商的 MX 或冲突规则时会停止。配置完成后需实际验证收件。
 
+人像上传时，浏览器会将长边超过 2560 像素的照片等比缩小并压缩为 JPEG；网站接收原图核对下架指纹，审核并保存处理后的照片。原文件大小上限仍为 10 MB，单人和多人模式均适用。
+
 真实支付测试可在 `site.setup.json` 的 `payment` 中设置 `testPackageEnabled: true` 与 `createProducts: true`，执行 `npm run setup -- --apply` 和 `npm run deploy`，再从管理员后台运营设置发起 $0.01 / 100 积分的真实 Waffo 支付。测试后将开关改为 `false` 并重跑两条命令可关闭新下单；Waffo 商品需在后台另行停用。保留商品映射和订单以处理延迟回调。
 
 后台支付连接测试检查在售套餐，订阅关闭时仍检查已有订阅或历史订单涉及的订阅套餐；从未出售的订阅套餐不会被误报为缺失。
