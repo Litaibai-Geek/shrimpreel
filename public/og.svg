@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ecedee"/>
+      <stop offset="100%" stop-color="#f4f5f5"/>
+    </linearGradient>
+    <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e34a32"/>
+      <stop offset="50%" stop-color="#f05a3c"/>
+      <stop offset="100%" stop-color="#e34a32"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="8" stdDeviation="16" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- 装饰性圆圈 -->
+  <circle cx="950" cy="120" r="180" fill="#e34a32" opacity="0.06"/>
+  <circle cx="180" cy="520" r="130" fill="#f05a3c" opacity="0.04"/>
+
+  <!-- Logo 图标 -->
+  <rect x="80" y="80" width="90" height="90" rx="18" fill="url(#logo-grad)" filter="url(#shadow)"/>
+  <path d="M 108 110 L 108 150 L 142 130 Z" fill="#ffffff" opacity="0.95"/>
+
+  <!-- 品牌名 -->
+  <text x="195" y="140" font-family="Inter, sans-serif" font-size="32" font-weight="600" fill="#232427" letter-spacing="-0.5">Tiny Desk AI</text>
+
+  <!-- 主标题 -->
+  <text x="80" y="270" font-family="Inter, sans-serif" font-size="68" font-weight="700" fill="#232427" letter-spacing="-2.4">Transform Your Photos</text>
+  <text x="80" y="355" font-family="Inter, sans-serif" font-size="68" font-weight="700" fill="#232427" letter-spacing="-2.4">into</text>
+  <text x="220" y="355" font-family="Inter, sans-serif" font-size="68" font-weight="700" fill="#e34a32" letter-spacing="-2.4">Viral Videos</text>
+
+  <!-- 副标题 -->
+  <text x="80" y="420" font-family="Inter, sans-serif" font-size="26" font-weight="400" fill="#55575c" letter-spacing="-0.3">AI-powered video generation in seconds</text>
+
+  <!-- 右侧装饰卡片 -->
+  <g filter="url(#shadow)">
+    <rect x="760" y="160" width="380" height="360" rx="28" fill="#ffffff" opacity="0.95"/>
+
+    <!-- 视频缩略图区域 -->
+    <rect x="800" y="200" width="300" height="180" rx="16" fill="#f4f5f5"/>
+
+    <!-- 播放按钮 -->
+    <circle cx="950" cy="290" r="32" fill="#e34a32" opacity="0.15"/>
+    <path d="M 940 278 L 940 302 L 964 290 Z" fill="#e34a32"/>
+
+    <!-- 进度条 -->
+    <rect x="800" y="405" width="300" height="6" rx="3" fill="#e0e1e3"/>
+    <rect x="800" y="405" width="180" height="6" rx="3" fill="#e34a32"/>
+
+    <!-- 信息行 -->
+    <circle cx="815" cy="445" r="10" fill="#e34a32" opacity="0.2"/>
+    <rect x="835" y="438" width="200" height="5" rx="2.5" fill="#e0e1e3"/>
+    <rect x="835" y="458" width="140" height="5" rx="2.5" fill="#e0e1e3"/>
+    <circle cx="1010" cy="445" r="10" fill="#e34a32" opacity="0.2"/>
+    <rect x="1030" y="438" width="90" height="5" rx="2.5" fill="#e0e1e3"/>
+    <rect x="1030" y="458" width="70" height="5" rx="2.5" fill="#e0e1e3"/>
+  </g>
+
+  <!-- 底部点缀 -->
+  <circle cx="80" cy="580" r="4" fill="#e34a32" opacity="0.3"/>
+  <circle cx="100" cy="580" r="4" fill="#f05a3c" opacity="0.3"/>
+  <circle cx="120" cy="580" r="4" fill="#e34a32" opacity="0.3"/>
+</svg>

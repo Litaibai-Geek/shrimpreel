@@ -15,14 +15,14 @@ export function LocalLink({ to, children, ...rest }: Omit<ComponentProps<'a'>, '
   )
 }
 
-export function LogoMark({ className = 'size-9 text-sm' }: { className?: string }) {
+export function LogoMark({ className = 'size-9' }: { className?: string }) {
   return (
-    <span
+    <img
+      src="/logo.svg"
+      alt={site.brandName}
+      className={`shrink-0 ${className}`}
       aria-hidden
-      className={`grid shrink-0 place-items-center rounded-xl bg-(image:--logo-bg) font-bold tracking-tight text-(--logo-fg) shadow-sm ${className}`}
-    >
-      {site.logoMark}
-    </span>
+    />
   )
 }
 

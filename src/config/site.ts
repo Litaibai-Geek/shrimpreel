@@ -2,7 +2,7 @@
 // 文案在 src/content/<locale>.ts，通过 {keyword} 等变量自动套用。
 
 import type { ThemeName } from '#/lib/theme'
-import { demoMedia } from './demo-media'
+import { demoMedia } from './demo-media.ts'
 
 export const LOCALES = ['en', 'zh'] as const
 export type Locale = (typeof LOCALES)[number]
@@ -25,7 +25,7 @@ export const site = {
   trendPlatform: 'TikTok',
   ogImage: '/og.png',
   // 页面主题，可选值和效果见 src/lib/theme.ts
-  theme: 'classic' as ThemeName,
+  theme: 'studio' as ThemeName,
 
   // Kie 使用固定 14 秒参考视频；fal / yir / NanoAPI 继续使用与输出时长匹配的参考片段。
   template: {

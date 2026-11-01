@@ -2,7 +2,7 @@ import { useRouterState } from '@tanstack/react-router'
 import { CircleAlert, CircleCheck, Download, Upload } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { STYLES, cheapestPackageCovering, defaultStyle, formatPrice, site } from '#/config/site'
-import { BAND_MAX, BAND_MIN, BAND_ROLES } from '#/lib/band'
+import { BAND_MAX, BAND_MIN } from '#/lib/band'
 import { api, errorCode, isActiveGeneration, type Generation } from '#/lib/api'
 import { track } from '#/lib/attribution'
 import { useCheckout } from '#/lib/checkout'
@@ -35,7 +35,7 @@ export function Generator({ styleId: controlledStyleId, onStyleChange }: { style
   const styleId = controlledStyleId ?? ownStyleId
   const selectStyle = onStyleChange ?? setOwnStyleId
   const [durationId, setDurationId] = useState<string>(site.durations[site.durations.length - 1]!.id)
-  const [consent, setConsent] = useState(false)
+  const [consent, setConsent] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [generation, setGeneration] = useState<Generation | null>(null)

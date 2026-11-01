@@ -46,21 +46,26 @@ function Home() {
       {/* Hero：左侧生成器，右侧展示站长提供的真实 AI 生成视频 */}
       <section className="relative overflow-hidden">
         <div className="hero-glow pointer-events-none absolute inset-0" aria-hidden />
-        <div className="container-page relative grid gap-y-5 py-10 lg:grid-cols-[minmax(0,430px)_minmax(0,1fr)] lg:gap-x-16 lg:gap-y-5 lg:py-14">
+        <div className="container-page relative space-y-8 py-10 lg:py-14">
+          {/* 居中标题 */}
+          <div className="text-center">
+            <h1 className="font-display text-5xl leading-[1.04] tracking-tight sm:text-6xl">{c.hero.title}</h1>
+            <p className="mx-auto mt-4 max-w-2xl text-lg leading-8 text-muted">{c.hero.subtitle}</p>
+          </div>
+
+          {/* 生成器和预览 */}
+          <div className="grid gap-y-5 lg:grid-cols-[minmax(0,430px)_minmax(0,1fr)] lg:gap-x-16 lg:gap-y-5">
           {/* Desktop: a shared grid row keeps the generator and videos aligned in Solo and Band modes.
               Mobile order retains heading → generator → badge → previews. */}
           <div className="order-1 space-y-5">
-            <h1 className="font-display text-5xl leading-[1.04] tracking-tight sm:text-6xl">{c.hero.title}</h1>
-            <p className="text-lg leading-8 text-muted">{c.hero.subtitle}</p>
-          </div>
-          <div className="order-2 min-w-0 lg:order-3" id="create">
-            <Generator styleId={style.id} onStyleChange={setStyleId} />
-          </div>
-          <div className="order-3 flex items-start lg:order-2 lg:items-end">
             <span className="chip w-fit">
               <Flame className="size-4 text-accent" /> {c.hero.badge}
             </span>
           </div>
+          <div className="order-2 min-w-0 lg:order-3" id="create">
+            <Generator styleId={style.id} onStyleChange={setStyleId} />
+          </div>
+          <div className="order-3 lg:order-2" />
           <div className="order-4 flex min-w-0 flex-col gap-5">
             {STYLES.length > 1 ? (
               <div role="tablist" aria-label={c.generator.stepStyle} className="flex flex-wrap gap-2">
@@ -137,6 +142,7 @@ function Home() {
                 {c.articles.howTo.title} <ArrowRight className="size-4" />
               </LocalLink>
             </div>
+          </div>
           </div>
         </div>
       </section>
