@@ -50,7 +50,8 @@ const stripePrice = (override: Record<string, Record<string, unknown>> = {}) => 
   }
 }
 
-const probe = (target: Parameters<typeof runProbe>[1], env: Record<string, unknown>) => runProbe({ KV: { get: async () => ({}) }, ...env } as unknown as Env, target, admin)
+const historicalDb = (ids: string[]) => ({ prepare: () => ({ bind: () => ({ all: async () => ({ results: ids.map((plan_id) => ({ plan_id })) }) }) }) })
+const probe = (target: Parameters<typeof runProbe>[1], env: Record<string, unknown>) => runProbe({ KV: { get: async () => ({}) }, DB: historicalDb(site.plans.map((plan) => plan.id)), ...env } as unknown as Env, target, admin)
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -58,6 +59,16 @@ afterEach(() => {
 
 describe('支付探测', () => {
   const dodo = { PAYMENT_PROVIDER: 'dodo', DODO_API_KEY: DODO_KEY, DODO_PRODUCTS }
+
+  it('未售出订阅且关闭订阅时只检查积分包；有历史订阅或订单时仍检查相关套餐', async () => {
+    if (site.subscriptionsEnabled) return
+    const packagesOnly = JSON.stringify(Object.fromEntries(site.packages.map((pack) => [pack.id, `pdt_${pack.id}`])))
+    stubFetch({ '/products/': dodoPrice({}) })
+    expect(await probe('payment', { ...dodo, DODO_PRODUCTS: packagesOnly, DB: historicalDb([]) })).toMatchObject({ status: 'ok' })
+    const historic = await probe('payment', { ...dodo, DODO_PRODUCTS: packagesOnly, DB: historicalDb([site.plans[0]!.id]) })
+    expect(historic.status).toBe('fail')
+    expect(historic.message).toContain(site.plans[0]!.id)
+  })
 
   it('Dodo：每个套餐的商品和价格一致时 ok，只读 GET 商品接口，走 test 环境', async () => {
     const calls = stubFetch({ '/products/': dodoPrice({}) })

@@ -24,6 +24,8 @@ https://github.com/user-attachments/assets/895aab94-d0c9-474e-8d90-61a6c551e536
 
 真实支付测试：在 `site.setup.json` 的 `payment` 设置 `testPackageEnabled: true` 和 `createProducts: true`，依次运行 `npm run setup -- --apply` 和 `npm run deploy`，然后使用管理员账号在后台“运营设置”发起 $0.01 / 100 积分的 Waffo 测试支付。该套餐只能由管理员下单，付款和通知都是真实的。测试完成后将开关改为 `false` 并重新执行相同两条命令，停止新下单；Waffo 商品需在其后台另行停用，保留订单和商品映射以处理延迟回调。实际扣款可能含税，具体支付方式的最低金额需以 Waffo 为准。
 
+后台支付连接测试检查在售套餐；订阅关闭时，仍会检查已有订阅或历史订单涉及的订阅套餐，不会把从未出售的订阅套餐当作缺失。
+
 新建的 Resend 发送密钥会立即保存到本地；远端密钥存在但本地无法恢复时，初始化会创建新密钥并保留旧密钥，已有 Worker secret 不会被自动覆盖。
 
 ## 用 ShrimpReel 做的站

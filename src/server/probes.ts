@@ -72,9 +72,13 @@ async function probePayment(env: Env, override: string): Promise<Outcome> {
   const id = activePaymentProviderId(env, override)
   if (id === 'mock') return ok('mock 支付，不调用外部接口')
   const products = parseJsonRecord(id === 'dodo' ? env.DODO_PRODUCTS : id === 'stripe' ? env.STRIPE_PRODUCTS : env.WAFFO_PRODUCTS)
-  // 订阅关闭只会停止新订阅，不会终止已有订阅的续费和退款。
-  // 因此支付探测仍须检查 site.plans 中的商品；sellingPlans 只用于新销售入口。
-  const items = [...site.packages, ...site.plans]
+  // 订阅停止销售后，仍须检查已有订阅和尚未完成的历史订单；从未卖过的套餐不应报缺失。
+  const historical = await env.DB.prepare(
+    'SELECT DISTINCT plan_id FROM subscriptions WHERE provider = ? UNION SELECT DISTINCT package_id AS plan_id FROM orders WHERE provider = ?',
+  ).bind(id, id).all<{ plan_id: string }>()
+  const knownPlans = new Set(site.plans.map((plan) => plan.id))
+  const historicalIds = new Set((historical.results ?? []).map((row) => row.plan_id).filter((planId) => knownPlans.has(planId)))
+  const items = [...site.packages, ...site.plans.filter((plan) => site.subscriptionsEnabled || historicalIds.has(plan.id))]
   const missing = items.filter((pack) => !products[pack.id]).map((pack) => pack.id)
   if (id === 'waffo') {
     // 用不存在的订单号查一次付款：能返回空列表说明商户号、私钥和签名都正确
