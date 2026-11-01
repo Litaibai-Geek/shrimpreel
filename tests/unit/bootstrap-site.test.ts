@@ -7,7 +7,8 @@ import {
 } from '../../scripts/bootstrap-site.mjs'
 import { checkPublicConfig } from '../../scripts/pre-deploy.mjs'
 
-const raw = readFileSync('wrangler.jsonc', 'utf8')
+// 测试独立于本机已创建的生产资源 ID。
+const raw = updatePublicVar(updateResourceId(updateResourceId(readFileSync('wrangler.jsonc', 'utf8').replace(/("name"\s*:\s*)"[^"]+"/, '$1"tinydeskai"'), 'd1', '00000000-0000-0000-0000-000000000000'), 'kv', '00000000000000000000000000000000'), 'WAFFO_PRODUCTS', '{}')
 const { config } = ts.parseConfigFileTextToJson('wrangler.jsonc', raw)
 const setup = {
   site: { name: 'tinydeskai', domain: 'tinydeskai.website', adminEmail: 'admin@example.com' },
@@ -169,6 +170,22 @@ describe('bootstrap-site', () => {
     await expect(ensureCloudflare({ configText: bad, run: mock.run, apply: true,
       write: () => {}, log: () => {} })).rejects.toThrow('differs from remote database')
   })
+  it('Worker 改名后仍复用已绑定的 KV，不创建同名替代资源', async () => {
+    const mock = simulatedCloudflare()
+    mock.state.d1.push({ name: 'tinydeskai', uuid: d1Id })
+    mock.state.kv.push({ title: 'old-worker-kv', id: kvId })
+    const existing = updateResourceId(updateResourceId(raw, 'd1', d1Id), 'kv', kvId)
+    await ensureCloudflare({ configText: existing, run: mock.run, apply: true, write: () => {}, log: () => {} })
+    expect(mock.state.commands.some((command) => command.startsWith('kv namespace create'))).toBe(false)
+    expect(mock.state.kv).toHaveLength(1)
+  })
+  it('已绑定的 KV 不可见时停止而不创建新资源', async () => {
+    const mock = simulatedCloudflare()
+    mock.state.d1.push({ name: 'tinydeskai', uuid: d1Id })
+    const existing = updateResourceId(updateResourceId(raw, 'd1', d1Id), 'kv', kvId)
+    await expect(ensureCloudflare({ configText: existing, run: mock.run, apply: true, write: () => {}, log: () => {} })).rejects.toThrow('Configured KV ID is not visible')
+    expect(mock.state.commands.some((command) => command.startsWith('kv namespace create'))).toBe(false)
+  })
   it('sets public vars without embedding any secrets or removing JSONC comments', () => {
     const updated = patchPublicVars(raw, setup)
     expect(updated).toContain('test.apps.googleusercontent.com')
@@ -193,36 +210,50 @@ describe('bootstrap-site', () => {
     expect(ts.parseConfigFileTextToJson('wrangler.jsonc', patchPublicVars(raw, setup)).config.vars.EMAIL_LOGIN_ENABLED).toBe(config.vars.EMAIL_LOGIN_ENABLED)
     expect(() => validateSetup({ ...setup, email: { loginEnabled: 'true' } }, config)).toThrow('email.loginEnabled')
   })
-  it('未验证真实投递时拒绝启用邮箱登录，且不写文件或调用远端', async () => {
-    const logs: string[] = []
-    let writes = 0, calls = 0
+  it('一次初始化写入正式商品和邮箱登录目标，迁移留给下一步', async () => {
+    const mock = simulatedCloudflare()
+    const live = { ...setup, email: { from: 'noreply@example.com', loginEnabled: true }, payment: { provider: 'waffo', environment: 'prod', storeId: 'STO_test', createProducts: true } }
+    let stored = raw
+    const calls: string[][] = []
     const code = await main(['--apply'], {
-      read: (p: string) => p === 'site.setup.json' ? JSON.stringify({ ...setup, email: { loginEnabled: true } }) : raw,
-      write: () => { writes++ }, runWrangler: () => { calls++; return { ok: false, output: '' } },
-      log: (line: string) => logs.push(line),
+      exists: () => true,
+      read: (p: string) => p === 'site.setup.json' ? JSON.stringify(live) : p === '.dev.vars.production' ? 'WAFFO_MERCHANT_ID=test\nWAFFO_PRIVATE_KEY=test\n' : stored,
+      write: (_p: string, value: string) => { stored = value },
+      runWrangler: mock.run,
+      runNode: (args: string[]) => { calls.push(args); return { ok: true, output: 'WAFFO_PRODUCTS={"starter":"a","party":"b","squad":"c"}\n' } },
+      log: () => {},
     })
-    expect(code).toBe(1)
-    expect(logs.join('\n')).toContain('--email-login-tested')
-    expect(writes).toBe(0)
-    expect(calls).toBe(0)
+    expect(code).toBe(0)
+    const vars = ts.parseConfigFileTextToJson('wrangler.jsonc', stored).config.vars
+    expect(vars.EMAIL_LOGIN_ENABLED).toBe('true')
+    expect(JSON.parse(vars.WAFFO_PRODUCTS)).toEqual({ starter: 'a', party: 'b', squad: 'c' })
+    expect(calls.find((args) => args[0] === 'scripts/waffo-setup.mjs')).toContain('--prod')
+    expect(calls.some((args) => args[0] === 'scripts/setup-www-redirect.mjs')).toBe(true)
+    expect(mock.state.commands.some((command) => command.includes('migrations'))).toBe(false)
   })
-  it('邮箱登录启用前拒绝远端迁移或密钥未就绪，且不写配置', async () => {
-    const logs: string[] = [], calls: string[] = []
-    let writes = 0
-    const configuredRaw = raw.replace('"TURNSTILE_SITE_KEY": ""', '"TURNSTILE_SITE_KEY": "site-key"')
-    const code = await main(['--apply', '--email-login-tested'], {
-      read: (p: string) => p === 'site.setup.json' ? JSON.stringify({ ...setup, email: { loginEnabled: true } }) : configuredRaw,
-      write: () => { writes++ },
-      runWrangler: (args: string[]) => {
-        calls.push(args.join(' '))
-        return args[0] === 'd1' ? { ok: true, output: 'No migrations to apply!' } : { ok: true, output: '[{"name":"SESSION_SECRET"}]' }
-      },
+  it('邮箱登录缺发件地址时在写文件前停止', async () => {
+    const logs: string[] = []
+    const code = await main(['--apply'], {
+      read: (p: string) => p === 'site.setup.json' ? JSON.stringify({ ...setup, email: { loginEnabled: true, from: '' } }) : raw,
+      write: () => { throw new Error('不应写入') }, log: (line: string) => logs.push(line),
+    })
+    expect(code).toBe(1)
+    expect(logs.join('\n')).toContain('EMAIL_FROM')
+  })
+  it('平台找不到域名时提供明确诊断并且不暴露子进程输出', async () => {
+    const mock = simulatedCloudflare()
+    const logs: string[] = []
+    const configured = { ...setup, platforms: { cloudflare: { turnstile: true } } }
+    const code = await main(['--apply'], {
+      exists: () => true,
+      read: (p: string) => p === 'site.setup.json' ? JSON.stringify(configured) : p === '.dev.vars.platform' ? 'CLOUDFLARE_API_TOKEN=test-token\n' : raw,
+      write: () => {}, runWrangler: mock.run,
+      runNode: () => ({ ok: false, output: 'Cloudflare zone not found or inaccessible; test-token' }),
       log: (line: string) => logs.push(line),
     })
     expect(code).toBe(1)
-    expect(logs.join('\n')).toContain('TURNSTILE_SECRET_KEY')
-    expect(calls).toEqual(['d1 migrations list DB --remote', 'secret list --format json'])
-    expect(writes).toBe(0)
+    expect(logs.join('\n')).toContain('当前平台 Token 没有读取该 Zone 的权限')
+    expect(logs.join('\n')).not.toContain('test-token')
   })
   it('验证时发现公开配置不同步则先停止，不执行远端操作', async () => {
     const logs: string[] = []
@@ -233,16 +264,7 @@ describe('bootstrap-site', () => {
     expect(logs.join('\n')).toContain('VIDEO_PROVIDER')
     expect(calls).toBe(0)
   })
-  it('requires extra consent for live Waffo product creation and remote D1 migrations', async () => {
-    const live = { ...setup, payment: { provider: 'waffo', environment: 'prod', storeId: 'STO_test', createProducts: true } }
-    const logs: string[] = []
-    const run = async (argv: string[]) => main(argv, {
-      read: (p: string) => p === 'site.setup.json' ? JSON.stringify(live) : raw,
-      write: () => { throw new Error('do not write') },
-      log: (v: string) => { logs.push(v) },
-    })
-    expect(await run(['--apply'])).toBe(1)
-    expect(logs.join('\n')).toContain('--allow-live-payments')
-    expect(await run(['--with-migrations'])).toBe(1)
+  it('不允许单独指定迁移而不执行初始化', async () => {
+    expect(await main(['--with-migrations'], { log: () => {} })).toBe(1)
   })
 })

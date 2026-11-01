@@ -20,14 +20,15 @@
     "cf:types": "wrangler types --strict-vars=false",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "seed:local": "node scripts/seed-local.mjs",
-    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "db:migrate:remote": "node scripts/wrangler-platform.mjs d1 migrations apply DB --remote --yes",
     "doctor": "node scripts/doctor.mjs",
-    "deploy": "node scripts/pre-deploy.mjs && npm run doctor && npm run build && wrangler deploy",
+    "deploy": "node scripts/pre-deploy.mjs && npm run doctor && npm run typecheck && npm test && npm run build && node scripts/wrangler-platform.mjs deploy",
     "media:placeholder": "node scripts/generate-placeholder-media.mjs",
     "media:download": "node scripts/download-demo-media.mjs",
     "setup": "node scripts/bootstrap-site.mjs",
     "setup:platforms": "node scripts/bootstrap-platforms.mjs",
-    "sync:wrangler": "node scripts/sync-wrangler-vars.mjs"
+    "sync:wrangler": "node scripts/sync-wrangler-vars.mjs",
+    "dns:update": "node scripts/update-nameservers.mjs"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "1.66.0",

@@ -54,6 +54,18 @@ const MAX_ACTIVE_JOBS_PER_USER = 3
 
 export const app = new Hono<AppContext>()
 
+// www 跳转中间件：将 www 子域名 301 跳转到裸域
+app.use('*', async (c, next) => {
+  const host = c.req.header('host')
+  if (host?.startsWith('www.')) {
+    const bareHost = host.substring(4) // 移除 'www.'
+    const url = new URL(c.req.url)
+    url.host = bareHost
+    return c.redirect(url.toString(), 301)
+  }
+  return next()
+})
+
 app.onError((error, c) => {
   if (error instanceof ApiError) {
     const status = error.status as ContentfulStatusCode
@@ -310,7 +322,7 @@ app.post('/api/auth/password/register', async (c) => {
 app.post('/api/auth/password/signin', async (c) => {
   await rateLimit(c.env.AUTH_LIMITER, 'signin-ip:' + (c.req.header('cf-connecting-ip') ?? 'local'))
 
-  const { email, password, locale } = await readJson<{
+  const { email, password } = await readJson<{
     email: string
     password: string
     locale?: string

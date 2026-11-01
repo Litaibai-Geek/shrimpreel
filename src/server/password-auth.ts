@@ -1,11 +1,10 @@
 // 简单的邮箱密码注册登录（当 email.loginEnabled=false 时）
 // 不发送验证码，通过 Turnstile + IP 限制防止滥用
-import { site } from '#/config/site'
 import type { RequestAttribution } from './attribution'
 import type { SignupReferral } from './referrals'
 import { isAdminEmail, upsertUser, type SignInProfile } from './auth'
 import type { UserRow } from './types'
-import { ApiError, createId, nowIso, sha256Hex } from './util'
+import { ApiError, nowIso, sha256Hex } from './util'
 
 // 密码强度要求
 const PASSWORD_MIN_LENGTH = 8
@@ -135,8 +134,8 @@ export async function registerWithPassword(env: Env, input: {
     picture: null,
     googleSub: null,
     emailLoginEnabled: true, // 密码注册的用户默认启用邮箱登录
-    country: input.country,
-    locale: input.locale,
+    country: input.country ?? null,
+    locale: input.locale ?? null,
     attribution: input.attribution,
     referral: input.referral,
   }

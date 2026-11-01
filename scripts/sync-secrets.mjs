@@ -13,6 +13,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { sellingPlans, site } from '../src/config/site.ts'
 import { checkConfig, isWeakSessionSecret } from '../src/server/config-health.ts'
+import { cloudflareEnv } from './cloudflare-env.mjs'
 import { configBindings, parseSecretNames, readWranglerConfig } from './doctor.mjs'
 
 const EXAMPLE_FILE = fileURLToPath(new URL('../.dev.vars.example', import.meta.url))
@@ -96,7 +97,7 @@ export function redact(output, values) {
 }
 
 function runWrangler(args, input) {
-  const result = spawnSync(process.execPath, [WRANGLER_BIN, ...args], { encoding: 'utf8', input })
+  const result = spawnSync(process.execPath, [WRANGLER_BIN, ...args], { encoding: 'utf8', input, env: cloudflareEnv() })
   return { ok: result.status === 0, output: `${result.stdout ?? ''}\n${result.stderr ?? ''}` }
 }
 
@@ -112,6 +113,7 @@ export function main(args, { wrangler = runWrangler, gitIgnored = isGitIgnored, 
   const file = arg('--file') ?? '.dev.vars.production'
   const apply = args.includes('--apply')
   const overwrite = args.includes('--overwrite')
+  const createIfMissing = args.includes('--create-if-missing')
   const fail = (message) => (log(`✗ ${message}`), 1)
 
   if (!existsSync(file)) return fail(`找不到 ${file}：从 .dev.vars.example 复制一份，填上线用的值`)
@@ -120,11 +122,14 @@ export function main(args, { wrangler = runWrangler, gitIgnored = isGitIgnored, 
   const config = readWranglerConfig(configFile)
   const parsed = parseDotenv(readFileSync(file, 'utf8'))
   const list = wrangler(['secret', 'list', '--format', 'json', '-c', configFile])
-  const remoteNames = list.ok ? parseSecretNames(list.output) : null
+  // 只有 Wrangler 明确报告目标 Worker 不存在时才允许创建草稿；其他失败不能当作空列表。
+  const missingWorker = !list.ok && list.output.includes(`Worker "${config.name}" not found.`)
+  const remoteNames = list.ok ? parseSecretNames(list.output) : createIfMissing && missingWorker ? [] : null
   const example = readFileSync(EXAMPLE_FILE, 'utf8')
   const known = exampleSecrets(example)
   // 未使用的服务可留空；未知键仍保留用于报错，避免拼错后被静默忽略。
-  const entries = parsed.entries.filter(([name, value]) => value.trim() || !known.has(name))
+  const publicNames = parsed.entries.filter(([name]) => name in (config.vars ?? {})).map(([name]) => name)
+  const entries = parsed.entries.filter(([name, value]) => !(name in (config.vars ?? {})) && (value.trim() || !known.has(name)))
   const plan = planSecrets({ entries, example, remoteNames, config, overwrite })
   const seen = new Set()
   const duplicates = []
@@ -135,7 +140,8 @@ export function main(args, { wrangler = runWrangler, gitIgnored = isGitIgnored, 
   const errors = [...new Set([...parsed.errors, ...plan.errors, ...duplicates])]
 
   log(`同步密钥：${file} → Worker ${config.name}（${configFile}，APP_ENV=${config.vars?.APP_ENV ?? '(空)'}）`)
-  log(remoteNames ? `远端已有 ${remoteNames.length} 个 secret` : '读不到远端 secret 列表：未登录 wrangler，或 Worker 还不存在')
+  log(missingWorker && createIfMissing ? 'Worker 不存在，将由 Wrangler 创建草稿并写入密钥' : remoteNames ? `远端已有 ${remoteNames.length} 个 secret` : '读不到远端 secret 列表：未登录 wrangler，或 Worker 还不存在')
+  if (publicNames.length) log(`跳过公开配置（由 site.setup.json 管理）：${publicNames.join('、')}`)
   const section = (title, items) => items.length && log(`\n${title}（${items.length}）：\n${items.map((i) => `  ${i}`).join('\n')}`)
   section('新增', plan.add)
   section('覆盖', plan.update)
@@ -144,6 +150,7 @@ export function main(args, { wrangler = runWrangler, gitIgnored = isGitIgnored, 
   section('同步后仍缺（doctor 会拦下部署）', plan.missing)
   section('✗ 文件有错误，不会写入', errors)
   if (errors.length) return 1
+  if (args.includes('--require-complete') && plan.missing.length) return fail('所选服务的必需密钥尚未配置，未写入')
 
   const count = Object.keys(plan.payload).length
   if (!apply) return log(`\n只出了计划，没有写入。确认后加 --apply 写入 ${count} 个。`), 0

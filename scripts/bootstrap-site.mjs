@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import ts from 'typescript'
 import { site } from '../src/config/site.ts'
 import { parseDotenv } from './sync-secrets.mjs'
-import { parsePendingMigrations, parseSecretNames } from './doctor.mjs'
+import { cloudflareEnv } from './cloudflare-env.mjs'
 
 const WRANGLER = fileURLToPath(new URL('../node_modules/wrangler/bin/wrangler.js', import.meta.url))
 const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i
@@ -17,7 +17,7 @@ const safeSecretPath = (path) => /^\.dev\.vars\.[A-Za-z0-9_-]+$/.test(path)
 
 function runChild(file, args, env) {
   const r = spawnSync(process.execPath, [file, ...args], {
-    encoding: 'utf8', env: env ?? process.env, maxBuffer: 10 * 1024 * 1024,
+    encoding: 'utf8', env: cloudflareEnv(env ?? process.env), maxBuffer: 10 * 1024 * 1024,
   })
   // Never relay raw output: even a CLI error can contain a credential.
   return { ok: r.status === 0, output: (r.stdout ?? '') + '\n' + (r.stderr ?? '') }
@@ -170,7 +170,13 @@ export async function ensureCloudflare({ configText, run, apply, write, log }) {
   log('D1 已验证: ' + names.d1)
 
   const kvList = () => parseList(call(['kv', 'namespace', 'list']))
-  let namespace = findNamed(kvList(), names.kv, 'title')
+  const existingNamespaces = kvList()
+  // 已绑定的有效 ID 优先，Worker 改名不应创建或切换 KV。
+  const hasBoundKv = KV_ID.test(names.oldKv ?? '') && !isPlaceholder(names.oldKv)
+  let namespace = hasBoundKv
+    ? findNamed(existingNamespaces, names.oldKv, 'id')
+    : findNamed(existingNamespaces, names.kv, 'title')
+  if (hasBoundKv && !namespace) throw new Error('Configured KV ID is not visible; refusing to create or replace it')
   if (!namespace) {
     if (!apply) throw new Error('Missing KV: ' + names.kv)
     log('创建 KV: ' + names.kv)
@@ -185,7 +191,7 @@ export async function ensureCloudflare({ configText, run, apply, write, log }) {
   const updated = updateResourceId(text, 'kv', kvId)
   if (apply && updated !== text) write(updated)
   text = updated
-  log('KV 已验证: ' + names.kv)
+  log('KV 已验证: ' + (namespace.title ?? names.kv))
 
   // R2 and Queues have name-addressed "info" commands, avoiding brittle table parsers.
   const checkOrCreate = (info, create, label) => {
@@ -258,14 +264,13 @@ function argsForMain(argv) {
     setupFile: value('--config', 'site.setup.json'),
     wranglerFile: value('--wrangler', 'wrangler.jsonc'),
     withMigrations: argv.includes('--with-migrations'),
-    allowLivePayments: argv.includes('--allow-live-payments'),
-    emailLoginTested: argv.includes('--email-login-tested'),
   }
 }
 
 export function main(argv = process.argv.slice(2), deps = {}) {
   const log = deps.log ?? console.log
   const read = deps.read ?? ((path) => readFileSync(path, 'utf8'))
+  const exists = deps.exists ?? existsSync
   const write = deps.write ?? ((path, value) => writeFileSync(path, value, 'utf8'))
   const runWrangler = deps.runWrangler ?? ((args) => runChild(WRANGLER, [...args, '-c', options.wranglerFile]))
   const runNode = deps.runNode ?? ((args, env) => runChild(fileURLToPath(new URL('../' + args[0], import.meta.url)), args.slice(1), env))
@@ -289,9 +294,6 @@ export function main(argv = process.argv.slice(2), deps = {}) {
       if (original !== draft) log('  · 待更新的公开配置: ' + changedVars(original, draft).join(', '))
       return 0
     }
-    if (options.mode === 'apply' && setup.payment?.createProducts && setup.payment.environment === 'prod' && !options.allowLivePayments) {
-      throw new Error('Creating live Waffo products requires --allow-live-payments')
-    }
     if (options.mode === 'verify' && original !== draft) {
       throw new Error('配置尚未同步到 ' + options.wranglerFile + ': ' + changedVars(original, draft).join(', ') + '；请检查计划并执行 --apply')
     }
@@ -299,11 +301,11 @@ export function main(argv = process.argv.slice(2), deps = {}) {
       const platforms = setup.platforms ?? {}
       const cloudflare = platforms.cloudflare ?? {}
       const resend = platforms.resend ?? {}
-      if ((setup.secrets?.sync || setup.payment?.createProducts || cloudflare.turnstile || cloudflare.analytics || resend.enabled) && !existsSync(secretsPath)) {
+      if ((setup.secrets?.sync || setup.payment?.createProducts || cloudflare.turnstile || cloudflare.analytics || resend.enabled) && !exists(secretsPath)) {
         throw new Error('Create the local runtime secrets file before initialization')
       }
       if (cloudflare.turnstile || cloudflare.analytics || resend.enabled) {
-        if (!existsSync('.dev.vars.platform')) throw new Error('Create .dev.vars.platform and configure platform credentials first')
+        if (!exists('.dev.vars.platform')) throw new Error('Create .dev.vars.platform and configure platform credentials first')
         const parsed = parseDotenv(read('.dev.vars.platform'))
         if (parsed.errors.length) throw new Error('Invalid platform credentials file')
         const env = Object.fromEntries(parsed.entries)
@@ -311,24 +313,15 @@ export function main(argv = process.argv.slice(2), deps = {}) {
         if (resend.enabled && !env.RESEND_ADMIN_API_KEY) throw new Error('Missing Resend administrator key')
       }
       if (setup.payment?.createProducts) {
-        if (!existsSync(secretsPath)) throw new Error('Waffo needs a local secrets file')
+        if (!exists(secretsPath)) throw new Error('Waffo needs a local secrets file')
         const parsed = parseDotenv(read(secretsPath))
         if (parsed.errors.length) throw new Error('Invalid local secrets file; check its lines')
         const env = Object.fromEntries(parsed.entries)
         if (!env.WAFFO_MERCHANT_ID || !env.WAFFO_PRIVATE_KEY) throw new Error('Missing Waffo merchant ID/private key')
       }
-      // 正式开启前先核对真实发信、远端密钥和迁移；失败时不修改配置。
-      const currentVars = parsedConfig(original).vars ?? {}
-      if (setup.email?.loginEnabled === true && currentVars.EMAIL_LOGIN_ENABLED !== 'true') {
-        if (!options.emailLoginTested) throw new Error('邮箱登录尚未启用：请先验证发信域名、Turnstile 和真实邮件投递，完成后使用 --email-login-tested')
-        const vars = parsedConfig(draft).vars ?? {}
-        if (!vars.EMAIL_FROM || !vars.TURNSTILE_SITE_KEY) throw new Error('邮箱登录需要已验证的 EMAIL_FROM 和 TURNSTILE_SITE_KEY')
-        const migrations = runWrangler(['d1', 'migrations', 'list', 'DB', '--remote'])
-        const pending = migrations.ok ? parsePendingMigrations(migrations.output) : null
-        if (pending === null || pending.length) throw new Error('请先确认远端 D1 已应用全部迁移，再启用邮箱登录')
-        const result = runWrangler(['secret', 'list', '--format', 'json'])
-        const names = result.ok ? parseSecretNames(result.output) : null
-        if (!names || !['SESSION_SECRET', 'TURNSTILE_SECRET_KEY'].every((name) => names.includes(name))) throw new Error('远端 Worker 缺少邮箱登录所需的 SESSION_SECRET 或 TURNSTILE_SECRET_KEY')
+      // 初始化只写本地目标配置；远端迁移由下一步执行，上线前 doctor 再核对密钥和配置。
+      if (setup.email?.loginEnabled === true && !parsedConfig(draft).vars?.EMAIL_FROM) {
+        throw new Error('启用邮箱登录需要配置 EMAIL_FROM')
       }
     }
     const runner = (args) => runWrangler(args)
@@ -361,12 +354,31 @@ export function main(argv = process.argv.slice(2), deps = {}) {
       const enabled = Boolean(platforms.cloudflare?.turnstile || platforms.cloudflare?.analytics || platforms.resend?.enabled)
       if (enabled) {
         const result = runNode(['scripts/bootstrap-platforms.mjs', '--apply', '--config', options.setupFile, '--wrangler', options.wranglerFile])
-        if (!result.ok) throw new Error('V2 platform provisioning failed; inspect with npm run setup:platforms -- --verify')
+        const nameservers = result.output.match(/^CLOUDFLARE_NAMESERVERS=([a-z0-9.,-]+)\s*$/im)?.[1]
+        if (nameservers) {
+          log('Cloudflare 分配的 nameserver：' + nameservers)
+          log('请先核对并迁移现有 DNS 记录，再到域名注册商更新 nameserver。')
+        }
+        if (!result.ok) {
+          const status = result.output.match(/Platform API (GET|POST|PATCH|PUT|DELETE) failed with HTTP (\d{3})/)
+          const diagnostic = status
+            ? `平台 API ${status[1]} 返回 HTTP ${status[2]}，请检查 Token 权限和平台资源状态`
+            : result.output.includes('Cloudflare zone not found or inaccessible')
+            ? 'Cloudflare 未找到站点域名或当前平台 Token 没有读取该 Zone 的权限'
+            : '请运行 npm run setup:platforms -- --verify 查看只读诊断'
+          throw new Error('V2 平台配置失败：' + diagnostic)
+        }
         updated = read(options.wranglerFile)
         log('跨平台 V2 资源已处理（未部署）')
       }
+      const redirect = runNode(['scripts/setup-www-redirect.mjs', '--config', options.setupFile])
+      if (!redirect.ok) {
+        const status = redirect.output.match(/Cloudflare API (GET|POST) HTTP (\d{3})/)
+        throw new Error(status ? `www 重定向配置失败：Cloudflare API ${status[1]} HTTP ${status[2]}` : 'www 重定向配置失败，请核对现有 DNS 和重定向规则')
+      }
+      log('www 到主域名的永久重定向已验证')
       if (setup.payment?.createProducts) {
-        if (!existsSync(secretsPath)) throw new Error('Waffo needs a gitignored local secrets file: ' + secretsPath)
+        if (!exists(secretsPath)) throw new Error('Waffo needs a gitignored local secrets file: ' + secretsPath)
         const parsed = parseDotenv(read(secretsPath))
         if (parsed.errors.length) throw new Error('Invalid local secrets file; check its lines')
         const secretVars = Object.fromEntries(parsed.entries.filter(([k]) => ['WAFFO_MERCHANT_ID','WAFFO_PRIVATE_KEY'].includes(k)))
@@ -391,15 +403,49 @@ export function main(argv = process.argv.slice(2), deps = {}) {
       }
       if (setup.secrets?.sync) {
         const secretFile = setup.secrets.file || '.dev.vars.production'
-        if (!existsSync(secretFile)) throw new Error('Secrets file missing: ' + secretFile)
-        const result = runNode(['scripts/sync-secrets.mjs','--apply','--file',secretFile,'-c',options.wranglerFile])
-        if (!result.ok) throw new Error('Secret sync paused safely. Worker may not exist yet; use existing sync-secrets instructions after first Worker setup')
+        if (!exists(secretFile)) throw new Error('Secrets file missing: ' + secretFile)
+        const result = runNode(['scripts/sync-secrets.mjs','--apply','--create-if-missing','--require-complete','--file',secretFile,'-c',options.wranglerFile])
+        if (!result.ok) throw new Error('运行密钥同步失败或必需密钥缺失；请运行 node scripts/sync-secrets.mjs 查看不含密钥值的诊断')
         log('Cloudflare Secrets 已同步（未覆盖已有值）')
       }
       if (options.withMigrations) {
         const migration = runner(['d1','migrations','apply','DB','--remote','--yes'])
         if (!migration.ok) throw new Error('Remote D1 migration failed; inspect the database before retrying')
         log('D1 migrations 已应用')
+      }
+      // Auto-update DNS nameservers if Spaceship credentials are available
+      const cloudflareConfig = setup.platforms?.cloudflare
+      if (cloudflareConfig?.nameServers && cloudflareConfig.nameServers.length > 0 && cloudflareConfig.zoneStatus !== 'active') {
+        const domain = setup.site?.domain || site.domain
+        // Load Spaceship credentials from .dev.vars.platform
+        let spaceshipKey = process.env.SPACESHIP_API_KEY
+        let spaceshipSecret = process.env.SPACESHIP_API_SECRET
+        if (!spaceshipKey || !spaceshipSecret) {
+          const platformVarsPath = '.dev.vars.platform'
+          if (exists(platformVarsPath)) {
+            const parsed = parseDotenv(read(platformVarsPath))
+            const platformEnv = Object.fromEntries(parsed.entries)
+            spaceshipKey = platformEnv.SPACESHIP_API_KEY
+            spaceshipSecret = platformEnv.SPACESHIP_API_SECRET
+          }
+        }
+        if (spaceshipKey && spaceshipSecret) {
+          log('')
+          log('=== 自动 DNS 配置 ===')
+          const { autoUpdateAndWaitForDNS } = await import('./spaceship-dns.mjs')
+          const dnsSuccess = await autoUpdateAndWaitForDNS(
+            domain,
+            cloudflareConfig.nameServers,
+            spaceshipKey,
+            spaceshipSecret,
+            log,
+            1800, // 最长等待 30 分钟
+            30    // 每 30 秒检查一次
+          )
+          if (dnsSuccess) {
+            log('✓ DNS 配置完成，域名已激活')
+          }
+        }
       }
       log('初始化结束。未部署、未配置 OAuth 客户端或域名 DNS；请运行 npm run doctor。')
       return 0

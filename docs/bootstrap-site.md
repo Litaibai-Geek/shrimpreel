@@ -17,20 +17,26 @@
 | 文件 | 配置内容 |
 | --- | --- |
 | `site.setup.json` | 公开的站点初始化选择：`site.adminEmail`、`google.clientId`、`payment`、`video.provider`、`moderation.provider`、`email.from`、`email.loginEnabled` 和平台功能开关；不放密钥 |
-| `.dev.vars.platform` | Cloudflare、Resend 平台管理凭据，仅用于本地初始化，不同步到 Worker |
+| `.dev.vars.platform` | Cloudflare、Resend 平台管理凭据，仅用于本地初始化，不同步到 Worker。初始化、远端迁移和部署会使用其中的 Cloudflare Token；显式环境变量优先 |
 | `.dev.vars.production` | Worker 运行密钥，如 Google Client Secret、支付商私钥、视频服务商 Key 和审核 Key |
 | `src/config/site.ts` | 站点域名、品牌、素材、模型参数、时长和价格；站点域名从这里读取 |
 | `wrangler.jsonc` | Worker 部署参数和资源绑定；初始化将站点公开配置及自动生成的 ID 写入这里 |
 
-公开配置以 `site.setup.json` 为准：先运行 `npm run setup -- --plan` 查看差异，再用 `--apply` 同步。商品自动创建时会先补齐 `WAFFO_PRODUCTS` 字段，并在成功后写入映射；已有映射保留。部署前只检查公开配置是否同步，不再用 `.dev.vars.production` 覆盖店铺或商品配置；该文件用于运行密钥。旧的 `sync:wrangler` 只显示计划，不能用 `.dev.vars` 写入生产配置。初始化仍受正式商品创建、邮箱验证和远端资源检查的保护。
+公开配置以 `site.setup.json` 为准：运行 `npm run setup -- --apply` 按配置初始化。商品自动创建时会先补齐 `WAFFO_PRODUCTS` 字段，并在成功后写入映射；已有映射保留。部署前只检查公开配置是否同步，不再用 `.dev.vars.production` 覆盖店铺或商品配置；该文件用于运行密钥。旧的 `sync:wrangler` 只显示计划，不能用 `.dev.vars` 写入生产配置。
 
 `video.provider` 可选 `kie`、`fal`、`yir`、`nanoapi`；`moderation.provider` 可选 `openai`、`none`。`email.from` 可填发件邮箱，空字符串表示不发信，`null` 或不填表示沿用 Wrangler 当前值。更换服务商时还要填写其运行密钥并检查 `site.ts` 中的模型参数。只有显式设置的字段才会覆盖 Wrangler；旧配置没有这些字段时保持原值。发件域名仍需在实际邮件服务中验证。
 
-`email.loginEnabled` 是邮箱注册和登录的目标开关，示例默认为 `false`，未填写时沿用 Wrangler 当前值。设为 `true` 后，先分别配置 Turnstile、验证发信域名并测试向真实邮箱投递，备份并应用远端 D1 迁移，再同步 Worker Secret。完成这些步骤后使用 `npm run setup -- --apply --email-login-tested`：该参数表示真实邮件投递已经测试，脚本会在写入开关前检查发件地址、Turnstile Site Key、远端迁移状态和远端所需密钥名称。若开启正式 Waffo 商品创建，还需要原有的 `--allow-live-payments`。执行完成仍须重新构建和部署；脚本无法代替真实投递测试。
+`email.loginEnabled` 是邮箱注册和登录的目标开关，示例默认为 `false`，未填写时沿用 Wrangler 当前值。设为 `true` 时，初始化写入本地目标配置，随后执行数据库迁移并在部署前验证发信域名、Turnstile、密钥和真实邮件投递。初始化本身不部署站点，也不能代替真实投递测试。
 
 `--verify` 会检查上述公开配置是否已写入 Wrangler，存在差异时列出字段名并停止；不检查正在运行的 Worker 是否已部署。生产密钥文件中未使用的已登记密钥可留空，未登记的键及重复键仍会报错；上线检查继续检查所选服务商的必需密钥。
 
 ## 常用命令（PowerShell）
+
+首次上线依次运行以下三条命令；部署会先运行 doctor、类型检查、单元测试和构建，任一失败则停止。迁移使用 `--yes`，修改已有生产数据库前应确认目标并备份。初始化要求所选服务的必需密钥可用，否则不会报告密钥同步成功。外部 DNS、支付 webhook、R2 参考视频和真实邮件投递仍需验收。
+
+    npm run setup -- --apply
+    npm run db:migrate:remote
+    npm run deploy
 
     npm run setup -- --plan
     npm run setup -- --apply
@@ -38,6 +44,7 @@
 
 --plan 默认离线，不连接任何平台，显示资源命名和待执行内容。
 --apply 查询远端资源；缺少时创建并重查，验证无误才写回 wrangler.jsonc 的 D1/KV ID。
+--apply 还会配置 www 到主域名的 308 重定向，保留路径、查询参数和请求方法；既有不同规则不会被覆盖，需要 Cloudflare Token 具备 DNS 与重定向规则权限。
 --verify 只读验证远端资源以及本地 D1/KV ID，不做修改。
 命令失败后可以再次运行 --apply；脚本按准确名字复用已有 Cloudflare 资源，不会使用旧的/不同 ID 覆盖当前生产绑定。
 
@@ -54,7 +61,7 @@ site.setup.json 中填写：
     "payment": { "provider": "waffo", "environment": "test", "storeId": "STO_...", "createProducts": true }
 
 此时 --apply 复用现有 scripts/waffo-setup.mjs 创建缺失的积分包，并在成功后写回 WAFFO_PRODUCTS，之后重复运行会跳过已有映射。
-开启正式 prod 商品需要额外增加 --allow-live-payments。
+当配置选择 `prod` 并启用 `createProducts` 时，`--apply` 会创建正式商品。
 
 首次创建 Waffo Webhook 仍要去后台确认端点（https://你的域名/api/webhooks/waffo）和事件，因为旧脚本的 add-webhook 尚不具备跨中断的幂等识别，不能在每次重试时盲目新建重复 Webhook。
 **如果 Waffo 商品创建中途失败，应先在 Waffo 后台检查已创建的商品并补全 WAFFO_PRODUCTS，再运行 --apply**，否则可能重复创建收费商品。
@@ -62,8 +69,7 @@ site.setup.json 中填写：
 ## Secrets 与首个 Worker
 
 配置 "secrets": {"file": ".dev.vars.production", "sync": true} 后，--apply 调用现有 scripts/sync-secrets.mjs 安全同步，默认不覆盖线上同名 Secret。
-若该 Worker 尚未发布，远端 Secret 列表可能不可读，脚本会**安全停止**，而不是使用 --overwrite 盲目覆盖。
-请先核实这是全新的 Worker，按现有 docs/env.md 的初次创建指引初始化 Secret，之后重跑 --apply。任何更新 Secret 的步骤都可能在 Cloudflare 生成 Worker 新版本；此脚本不直接执行 deploy。
+若 Wrangler 明确报告 Worker 不存在，初始化允许 Wrangler 创建草稿并写入密钥；认证或权限等其他错误会停止，已有密钥不覆盖。任何更新 Secret 的步骤都可能在 Cloudflare 生成 Worker 新版本；此脚本不部署网站代码。
 
 ## 仍需人工验收
 
@@ -75,7 +81,7 @@ site.setup.json 中填写：
 
 本脚本只协调资源的初始化，**不会自动发布正式网站**。
 
-启用 V2 时，现有 Cloudflare Zone 的 accountId 和 zoneId 可留空自动发现；权限、冲突处理和自定义文件的说明见 [bootstrap-v2.md](bootstrap-v2.md)。
+启用 V2 时，Cloudflare Zone 的 accountId 和 zoneId 可留空自动发现；缺失时初始化会尝试创建并输出 nameserver。切换前先核对和迁移 DNS 记录。权限、冲突处理和自定义文件的说明见 [bootstrap-v2.md](bootstrap-v2.md)。
 
 ## V2 login switch
 

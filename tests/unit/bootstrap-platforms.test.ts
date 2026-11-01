@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   main, platformOptions, platformConfig, provisionTurnstile, provisionAnalytics,
-  dnsEntries, setRuntimeSecret, discoverCloudflareIds,
+  dnsEntries, setRuntimeSecret, discoverCloudflareIds, runProvisioning,
 } from '../../scripts/bootstrap-platforms.mjs'
 
 const id = 'a'.repeat(32)
@@ -57,8 +57,47 @@ describe('platform bootstrap V2', () => {
     expect(await main(['--verify', '--config', 'custom.json', '--wrangler', 'custom-wrangler.jsonc'], deps)).toBe(0)
     expect(writes).toEqual([])
     expect(await main(['--apply', '--config', 'custom.json', '--wrangler', 'custom-wrangler.jsonc'], deps)).toBe(0)
-    expect(writes).toEqual(['.dev.vars.staging', 'custom-wrangler.jsonc', 'custom.json'])
+    expect(writes).toEqual(['custom.json', '.dev.vars.staging', 'custom-wrangler.jsonc'])
     expect(JSON.parse(files['custom.json']!).platforms.cloudflare).toMatchObject({ accountId: id, zoneId: 'b'.repeat(32) })
+  })
+
+  it('只在 apply 为唯一账号创建缺失域名，verify 不创建且重试复用', async () => {
+    let existing: any = null
+    let creates = 0
+    const api = async (method: string, path: string, body?: any) => {
+      if (method === 'GET' && path.startsWith('/zones?')) return existing ? [existing] : []
+      if (method === 'GET' && path.startsWith('/accounts?')) return [{ id }]
+      if (method === 'POST' && path === '/zones') {
+        creates++
+        existing = { name: body.name, id: 'b'.repeat(32), account: body.account, status: 'pending', name_servers: ['one.ns.cloudflare.com', 'two.ns.cloudflare.com'] }
+        return existing
+      }
+      throw new Error('unexpected request')
+    }
+    await expect(discoverCloudflareIds(api, setup.site.domain, {}, false)).rejects.toThrow('not found or inaccessible')
+    const created = await discoverCloudflareIds(api, setup.site.domain, {}, true)
+    expect(created).toMatchObject({ accountId: id, zoneId: 'b'.repeat(32), zoneStatus: 'pending' })
+    expect(created.nameServers).toHaveLength(2)
+    await discoverCloudflareIds(api, setup.site.domain, created, true)
+    expect(creates).toBe(1)
+    await expect(discoverCloudflareIds(async (_m: string, p: string) => p.startsWith('/accounts?') ? [{ id }, { id: 'c'.repeat(32) }] : [], setup.site.domain, {}, true)).rejects.toThrow('Ambiguous')
+    await expect(discoverCloudflareIds(api, 'another.example', { zoneId: 'c'.repeat(32) }, true)).rejects.toThrow()
+  })
+
+  it('Zone 创建后即使后续步骤失败，也保留 ID 并输出分配的 nameserver', async () => {
+    const configured = { site: setup.site, secrets: { file: '.dev.vars.production' }, platforms: { cloudflare: { turnstile: true } } }
+    const files: Record<string, string> = { 'site.setup.json': JSON.stringify(configured), 'wrangler.jsonc': '{"vars":{"TURNSTILE_SITE_KEY":""}}', 'src/config/site.ts': "cfBeaconToken: ''", '.dev.vars.production': '' }
+    const logs: string[] = []
+    const fetcher = async (url: string, options: { method: string }) => {
+      if (url.includes('/zones?')) return { ok: true, json: async () => ({ result: [] }) }
+      if (url.includes('/accounts?')) return { ok: true, json: async () => ({ result: [{ id }] }) }
+      if (url.endsWith('/zones') && options.method === 'POST') return { ok: true, json: async () => ({ result: { name: setup.site.domain, id: 'b'.repeat(32), account: { id }, status: 'pending', name_servers: ['one.ns.cloudflare.com', 'two.ns.cloudflare.com'] } }) }
+      return { ok: false, status: 403 }
+    }
+    const code = await main(['--apply'], { read: (name: string) => files[name], write: (name: string, value: string) => { files[name] = value }, vars: { CLOUDFLARE_API_TOKEN: 'valid-token-value' }, fetcher, log: (line: string) => logs.push(line) })
+    expect(code).toBe(1)
+    expect(JSON.parse(files['site.setup.json']!).platforms.cloudflare.zoneId).toBe('b'.repeat(32))
+    expect(logs.join('\n')).toContain('CLOUDFLARE_NAMESERVERS=one.ns.cloudflare.com,two.ns.cloudflare.com')
   })
 
   it('reuses already existing Turnstile widget after first creation', async () => {
@@ -80,5 +119,29 @@ describe('platform bootstrap V2', () => {
     expect(() => setRuntimeSecret('RESEND_API_KEY=old', 'RESEND_API_KEY', 'new')).toThrow('different')
     expect(() => dnsEntries([{ type: 'MX', name: 'send', value: 'mx.example.net' }], setup.site.domain, false))
       .toThrow('allowMx')
+  })
+
+  it('已有同名 Resend 密钥但本地无值时创建新密钥并立即保存，保留旧密钥', async () => {
+    const configured = { site: setup.site, platforms: { cloudflare: { accountId: id, turnstile: true }, resend: { enabled: true, createSendingKey: true } } }
+    const saved: string[] = [], calls: { method: string; path: string; body?: any }[] = [], logs: string[] = []
+    const cf = async (_method: string, path: string) => path.includes('?page=')
+      ? [{ name: 'site-' + setup.site.domain + '-login', domains: [setup.site.domain], sitekey: 'sitekey' }]
+      : { domains: [setup.site.domain], sitekey: 'sitekey', secret: 'turnstile-secret' }
+    const resend = async (method: string, path: string, body?: any) => {
+      calls.push({ method, path, body })
+      if (path.startsWith('/domains?')) return { data: [{ id: 'domain-id', name: setup.site.domain }] }
+      if (path === '/domains/domain-id') return { status: 'pending', records: [] }
+      if (path === '/api-keys' && method === 'GET') return { data: [{ name: 'site-' + setup.site.domain }] }
+      if (path === '/api-keys' && method === 'POST') return { token: 'replacement-secret' }
+      throw new Error('unexpected request')
+    }
+    const current = { wrangler: '{"TURNSTILE_SITE_KEY": "你的站点密钥"}', siteCode: '', secrets: 'TURNSTILE_SECRET_KEY=\nRESEND_API_KEY=\n' }
+    const result = await runProvisioning({ setup: configured, current, apply: true, cf, resend, log: (line: string) => logs.push(line), saveSecrets: (value: string) => saved.push(value) })
+    expect(saved).toHaveLength(2)
+    expect(saved[1]).toContain('RESEND_API_KEY=replacement-secret')
+    expect(result.wrangler).toContain('"TURNSTILE_SITE_KEY": "sitekey"')
+    expect(calls.find((call) => call.method === 'POST')?.body.name).toMatch(/^site-tinydeskai\.website-recovery-/)
+    expect(calls.some((call) => call.method === 'DELETE')).toBe(false)
+    expect(logs.join('\n')).not.toContain('replacement-secret')
   })
 })

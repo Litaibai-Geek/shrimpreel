@@ -12,7 +12,13 @@ https://github.com/user-attachments/assets/895aab94-d0c9-474e-8d90-61a6c551e536
 
 示例视频默认静音播放，可通过每个视频上的按钮单独打开或关闭声音，并在支持的浏览器中全屏观看。
 
-站点公开配置在 `site.setup.json` 中管理，由初始化脚本写入 `wrangler.jsonc`；部署前会检查配置是否同步，不会用运行密钥文件覆盖公开配置。
+站点公开配置在 `site.setup.json` 中管理，执行 `npm run setup -- --apply` 写入 `wrangler.jsonc`；缺少 Cloudflare Zone 时可自动创建并输出 nameserver，切换前须核对和迁移 DNS 记录。接着运行数据库迁移并部署。这些命令在未设置环境变量时使用 `.dev.vars.platform` 中的 Cloudflare Token。部署前会检查配置是否同步，不会用运行密钥文件覆盖公开配置。
+
+初始化通过 Cloudflare 重定向规则将 www 永久跳转到根域名，保留路径、查询参数和请求方法；Token 需要 DNS 和重定向规则权限。
+
+上线依次执行 `npm run setup -- --apply`、`npm run db:migrate:remote`、`npm run deploy`。部署前自动运行 doctor、类型检查、单元测试和构建。迁移现有生产数据库前应备份；外部 DNS、支付回调、参考视频和邮件投递仍需配置并验收。
+
+新建的 Resend 发送密钥会立即保存到本地；远端密钥存在但本地无法恢复时，初始化会创建新密钥并保留旧密钥，已有 Worker secret 不会被自动覆盖。
 
 ## 用 ShrimpReel 做的站
 

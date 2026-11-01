@@ -3,6 +3,7 @@
 // Platform admin credentials stay local, not inside site Workers.
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
+import { randomUUID } from 'node:crypto'
 import { parseDotenv } from './sync-secrets.mjs'
 import { site } from '../src/config/site.ts'
 
@@ -25,8 +26,8 @@ export function platformConfig(setup) {
   return { domain, cloudflare, resend }
 }
 
-// 根据站点域名查找现有 Zone；只接受唯一结果，不自动创建或切换 DNS。
-export async function discoverCloudflareIds(api, domain, configured) {
+// 查找站点或父域 Zone；仅在 apply 时为确定的账号创建缺失 Zone。
+export async function discoverCloudflareIds(api, domain, configured, apply = false) {
   if (!api) throw new Error('Cloudflare token required to discover accountId/zoneId')
   const labels = domain.split('.')
   let zone = null
@@ -36,12 +37,24 @@ export async function discoverCloudflareIds(api, domain, configured) {
     zone = onlyOne(rows.filter((row) => row.name?.toLowerCase() === name), 'Cloudflare zone for ' + name)
     if (zone) break
   }
+  if (!zone && apply) {
+    if (configured.zoneId) throw new Error('Configured zoneId is not visible; refusing to create another zone')
+    const accounts = await cloudflarePages(api, '/accounts')
+    const account = configured.accountId
+      ? onlyOne(accounts.filter((item) => item.id?.toLowerCase() === configured.accountId.toLowerCase()), 'Cloudflare account')
+      : onlyOne(accounts, 'Cloudflare account; set platforms.cloudflare.accountId')
+    if (!account || !/^[a-f0-9]{32}$/i.test(account.id ?? '')) throw new Error('Cloudflare account not found or inaccessible; check account permissions')
+    zone = await api('POST', '/zones', { name: domain, account: { id: account.id }, type: 'full' })
+    if (zone?.name?.toLowerCase() !== domain || zone.account?.id?.toLowerCase() !== account.id.toLowerCase()) {
+      throw new Error('Created Cloudflare zone does not match the expected domain or account')
+    }
+  }
   if (!zone) throw new Error('Cloudflare zone not found or inaccessible for ' + domain + '; check domain and token permissions')
   const accountId = zone.account?.id
   if (!/^[a-f0-9]{32}$/i.test(zone.id ?? '') || !/^[a-f0-9]{32}$/i.test(accountId ?? '')) throw new Error('Cloudflare zone returned invalid account or zone ID')
   if (configured.accountId && configured.accountId.toLowerCase() !== accountId.toLowerCase()) throw new Error('Cloudflare accountId conflicts with domain zone')
   if (configured.zoneId && configured.zoneId.toLowerCase() !== zone.id.toLowerCase()) throw new Error('Cloudflare zoneId conflicts with domain zone')
-  return { ...configured, accountId, zoneId: zone.id }
+  return { ...configured, accountId, zoneId: zone.id, ...(zone.name_servers?.length ? { nameServers: zone.name_servers } : {}), ...(zone.status ? { zoneStatus: zone.status } : {}) }
 }
 
 export function createApiClient(base, token, fetcher = fetch) {
@@ -166,7 +179,7 @@ export function setSiteValues(wrangler, siteCode, turnstile, analytics) {
     const pattern = /("TURNSTILE_SITE_KEY":\s*)"[^"]*"/g
     if ([...wrangler.matchAll(pattern)].length !== 1) throw new Error('TURNSTILE_SITE_KEY field missing')
     const old = wrangler.match(/"TURNSTILE_SITE_KEY":\s*"([^"]*)"/)?.[1]
-    if (old && old !== turnstile.siteKey) throw new Error('Turnstile key conflicts with current config')
+    if (old && old !== '你的站点密钥' && old !== turnstile.siteKey) throw new Error('Turnstile key conflicts with current config')
     newWrangler = wrangler.replace(pattern, (_, key) => key + JSON.stringify(turnstile.siteKey))
   }
   if (analytics) {
@@ -187,14 +200,17 @@ export function setRuntimeSecret(source, key, value) {
   return regex.test(source) ? source.replace(regex, key + '=' + value) : source.trimEnd() + '\n' + key + '=' + value + '\n'
 }
 
-export async function runProvisioning({ setup, current, apply, cf, resend, log }) {
+export async function runProvisioning({ setup, current, apply, cf, resend, log, saveSecrets = /** @type {(value: string) => void} */ (() => {}) }) {
   const { domain, cloudflare, resend: email } = platformConfig(setup)
   let turnstile = null, analytics = null, resendData = null
   let secrets = current.secrets
   if (cloudflare.turnstile) {
     if (!cf) throw new Error('Cloudflare administrator token required')
     turnstile = await provisionTurnstile(cf, cloudflare.accountId, domain, apply)
+    // 在创建其他平台资源前验证公开配置，避免后续才发现不可覆盖的冲突。
+    setSiteValues(current.wrangler, current.siteCode, turnstile, null)
     secrets = setRuntimeSecret(secrets, 'TURNSTILE_SECRET_KEY', turnstile.secret)
+    if (apply) saveSecrets(secrets)
     log('Turnstile: verified')
   }
   if (cloudflare.analytics) {
@@ -215,15 +231,17 @@ export async function runProvisioning({ setup, current, apply, cf, resend, log }
     }
     if (email.createSendingKey && !secrets.match(/^RESEND_API_KEY=\S+/m)) {
       const keys = await resend('GET', '/api-keys')
-      if (keys.data?.some((key) => key.name === 'site-' + domain)) {
-        throw new Error('Resend sending key already exists; manually reconcile the unrecoverable token')
-      }
+      const baseName = 'site-' + domain
+      const existing = keys.data?.some((key) => key.name === baseName || key.name?.startsWith(baseName + '-recovery-'))
       if (!apply) throw new Error('Resend sending key missing; rerun with --apply')
       const key = await resend('POST', '/api-keys', {
-        name: 'site-' + domain, permission: 'sending_access', domain_id: resendData.id,
+        name: existing ? baseName + '-recovery-' + randomUUID().slice(0, 8) : baseName,
+        permission: 'sending_access', domain_id: resendData.id,
       })
       if (!key.token) throw new Error('Resend did not return a sending token')
       secrets = setRuntimeSecret(secrets, 'RESEND_API_KEY', key.token)
+      saveSecrets(secrets)
+      if (existing) log('Resend 旧密钥值无法读取，已创建新的发送密钥；旧密钥未删除')
       log('Resend site-restricted sending key: created')
     }
   }
@@ -258,10 +276,18 @@ export async function main(args = process.argv.slice(2), overrides = {}) {
     const email = vars.RESEND_ADMIN_API_KEY ? createApiClient('https://api.resend.com', vars.RESEND_ADMIN_API_KEY, overrides.fetcher) : null
     const needsAccount = cloudflare.turnstile || cloudflare.analytics
     const needsZone = resend.enabled && resend.dns
-    if ((needsAccount && !cloudflare.accountId) || needsZone) {
-      cloudflare = await discoverCloudflareIds(cf, domain, cloudflare)
+    if (needsAccount || needsZone) {
+      cloudflare = await discoverCloudflareIds(cf, domain, cloudflare, mode === '--apply')
       setup.platforms.cloudflare = cloudflare
       log('Cloudflare account and zone discovered for ' + domain)
+      if (cloudflare.zoneStatus !== 'active' && cloudflare.nameServers?.length) {
+        log('CLOUDFLARE_NAMESERVERS=' + cloudflare.nameServers.join(','))
+        log('Zone 尚未激活；检查并迁移现有 DNS 记录后，在域名注册商更新 nameserver。')
+      }
+      if (mode === '--apply' && JSON.stringify(JSON.parse(setupText)) !== JSON.stringify(setup)) {
+        const write = overrides.write ?? writeFileSync
+        write(setupFile, JSON.stringify(setup, null, 2) + '\n')
+      }
     }
     const secretsFile = setup.secrets?.file || '.dev.vars.production'
     if (!/^\.dev\.vars\.[A-Za-z0-9_-]+$/.test(secretsFile) || secretsFile === '.dev.vars.platform') throw new Error('Invalid runtime secrets file')
@@ -270,13 +296,12 @@ export async function main(args = process.argv.slice(2), overrides = {}) {
       siteCode: read('src/config/site.ts', 'utf8'),
       secrets: read(secretsFile, 'utf8'),
     }
-    const result = await runProvisioning({ setup, current, apply: mode === '--apply', cf, resend: email, log })
+    const write = overrides.write ?? writeFileSync
+    const result = await runProvisioning({ setup, current, apply: mode === '--apply', cf, resend: email, log,
+      saveSecrets: (value) => write(secretsFile, value, { mode: 0o600 }) })
     if (mode === '--apply') {
-      const write = overrides.write ?? writeFileSync
-      if (result.secrets !== current.secrets) write(secretsFile, result.secrets, { mode: 0o600 })
       if (result.wrangler !== current.wrangler) write(wranglerFile, result.wrangler)
       if (result.siteCode !== current.siteCode) write('src/config/site.ts', result.siteCode)
-      if (JSON.stringify(JSON.parse(setupText)) !== JSON.stringify(setup)) write(setupFile, JSON.stringify(setup, null, 2) + '\n')
     }
     log('Completed; no Worker deployment performed.')
     return 0

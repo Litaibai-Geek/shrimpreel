@@ -82,7 +82,7 @@ describe('sync-secrets', () => {
     const wranglerFile = join(dir, 'wrangler.jsonc')
     const secretsFile = join(dir, '.dev.vars.production')
     writeFileSync(wranglerFile, JSON.stringify(config))
-    writeFileSync(secretsFile, `SESSION_SECRET=${STRONG}\nFAL_KEY=fal-secret-value\nRESEND_API_KEY=\n`)
+    writeFileSync(secretsFile, `SESSION_SECRET=${STRONG}\nFAL_KEY=fal-secret-value\nSITE_URL=https://wrong.example\nRESEND_API_KEY=\n`)
 
     const run = (args: string[], { remote = '[{"name":"SESSION_SECRET","type":"secret_text"}]' as string | null, ignored = true } = {}) => {
       const calls: { args: string[]; input?: string }[] = []
@@ -90,7 +90,7 @@ describe('sync-secrets', () => {
       const code = main(['-c', wranglerFile, '--file', secretsFile, ...args], {
         wrangler: (wargs, input) => {
           calls.push({ args: wargs, input })
-          if (wargs[1] === 'list') return remote === null ? { ok: false, output: 'not found' } : { ok: true, output: remote }
+          if (wargs[1] === 'list') return remote === null ? { ok: false, output: 'not found' } : remote === 'missing-worker' ? { ok: false, output: 'Worker "moonhop" not found.' } : { ok: true, output: remote }
           return { ok: true, output: `✨ Successfully created secret for key: FAL_KEY (echo fal-secret-value)` }
         },
         gitIgnored: () => ignored,
@@ -104,6 +104,7 @@ describe('sync-secrets', () => {
     expect(dry.bulk).toEqual([])
     expect(dry.out).toContain('新增（1）：\n  FAL_KEY')
     expect(dry.out).toContain('已存在，不覆盖')
+    expect(dry.out).toContain('跳过公开配置')
     expect(dry.out).not.toMatch(/fal-secret-value|aaaaaaaa/)
 
     const applied = run(['--apply'])
@@ -114,9 +115,19 @@ describe('sync-secrets', () => {
     expect(applied.out).toContain('(echo ***)')
     expect(applied.out).not.toContain('fal-secret-value')
 
+    const incomplete = run(['--apply', '--require-complete'])
+    expect([incomplete.code, incomplete.bulk.length]).toEqual([1, 0])
+    expect(incomplete.out).toContain('必需密钥尚未配置')
+
     const unknownRemote = run(['--apply'], { remote: null })
     expect([unknownRemote.code, unknownRemote.bulk.length]).toEqual([1, 0])
     expect(unknownRemote.out).toContain('加 --overwrite')
+    const unavailable = run(['--apply', '--create-if-missing'], { remote: null })
+    expect([unavailable.code, unavailable.bulk.length]).toEqual([1, 0])
+    const newWorker = run(['--apply', '--create-if-missing'], { remote: 'missing-worker' })
+    expect(newWorker.code).toBe(0)
+    expect(newWorker.bulk).toHaveLength(1)
+    expect(newWorker.out).toContain('创建草稿')
     const forced = run(['--apply', '--overwrite'], { remote: null })
     expect(Object.keys(JSON.parse(forced.bulk[0]!.input!))).toEqual(['SESSION_SECRET', 'FAL_KEY'])
 
