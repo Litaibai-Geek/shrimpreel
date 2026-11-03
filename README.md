@@ -14,6 +14,8 @@ Preview videos play muted by default; use each video's controls to turn sound on
 
 Public site settings are managed in `site.setup.json` and written to `wrangler.jsonc` by `npm run setup -- --apply`. Setup can create a missing Cloudflare zone and show its nameservers; review and migrate DNS records before changing the registrar settings. Run database migrations next, then deploy; these commands use the Cloudflare token in `.dev.vars.platform` when no token is set in the environment. The deployment check does not overwrite Wrangler settings from the runtime secrets file.
 
+Setup checks an existing zone ID before replacing old-site settings; it stops if the zone cannot be accessed or its account conflicts.
+
 Setup configures a permanent www-to-apex redirect using Cloudflare redirect rules, retaining the path, query string and request method. The Cloudflare token needs DNS and redirect-rule permissions.
 
 Set `GA4_MEASUREMENT_ID=G-...` in `.dev.vars.production` to enable GA4 on the next deployment. This public ID is copied to the site configuration before the build and is not uploaded as a Worker secret; an empty value disables GA4.

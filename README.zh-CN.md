@@ -14,6 +14,8 @@ https://github.com/user-attachments/assets/895aab94-d0c9-474e-8d90-61a6c551e536
 
 站点公开配置在 `site.setup.json` 中管理，执行 `npm run setup -- --apply` 写入 `wrangler.jsonc`；缺少 Cloudflare Zone 时可自动创建并输出 nameserver，切换前须核对和迁移 DNS 记录。接着运行数据库迁移并部署。这些命令在未设置环境变量时使用 `.dev.vars.platform` 中的 Cloudflare Token。部署前会检查配置是否同步，不会用运行密钥文件覆盖 Wrangler 配置。
 
+初始化会核实旧 Zone 是否属于其他域名，再自动替换旧站配置；旧 Zone 无法访问或账号冲突时会停止。
+
 初始化通过 Cloudflare 重定向规则将 www 永久跳转到根域名，保留路径、查询参数和请求方法；Token 需要 DNS 和重定向规则权限。
 
 在 `.dev.vars.production` 填写 `GA4_MEASUREMENT_ID=G-...`，下次部署构建前会同步到站点配置；该公开标识不会作为 Worker secret 上传，留空则关闭 GA4。

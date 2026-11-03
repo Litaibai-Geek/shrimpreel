@@ -77,6 +77,17 @@ export async function provisionEmailRouting(api, accountId, zoneId, domain, sour
 // 查找站点或父域 Zone；仅在 apply 时为确定的账号创建缺失 Zone。
 export async function discoverCloudflareIds(api, domain, configured, apply = false) {
   if (!api) throw new Error('Cloudflare token required to discover accountId/zoneId')
+  if (configured.zoneId && apply) {
+    // 仅在确认旧 Zone 属于其他域名时清理；不可访问时保留保护。
+    const previous = await api('GET', '/zones/' + configured.zoneId)
+    const previousName = previous?.name?.toLowerCase()
+    if (!previousName || !previous?.account?.id) throw new Error('Configured zoneId could not be verified')
+    if (configured.accountId && configured.accountId.toLowerCase() !== previous.account.id.toLowerCase()) throw new Error('Cloudflare accountId conflicts with configured zone')
+    if (domain !== previousName && !domain.endsWith('.' + previousName)) {
+      const { zoneId, zoneStatus, nameServers, ...rest } = configured
+      configured = rest
+    }
+  }
   const labels = domain.split('.')
   let zone = null
   for (let i = 0; i <= labels.length - 2; i++) {
@@ -332,10 +343,9 @@ export async function main(args = process.argv.slice(2), overrides = {}) {
     const vars = overrides.vars ?? loadPlatformEnv('.dev.vars.platform')
     const cf = vars.CLOUDFLARE_API_TOKEN ? createApiClient('https://api.cloudflare.com/client/v4', vars.CLOUDFLARE_API_TOKEN, overrides.fetcher) : null
     const email = vars.RESEND_ADMIN_API_KEY ? createApiClient('https://api.resend.com', vars.RESEND_ADMIN_API_KEY, overrides.fetcher) : null
-    const needsAccount = cloudflare.turnstile || cloudflare.analytics || setup.email?.routing?.enabled
-    const needsZone = (resend.enabled && resend.dns) || setup.email?.routing?.enabled
-    if (needsAccount || needsZone) {
+    {
       cloudflare = await discoverCloudflareIds(cf, domain, cloudflare, mode === '--apply')
+      setup.platforms ??= {}
       setup.platforms.cloudflare = cloudflare
       log('Cloudflare account and zone discovered for ' + domain)
       if (cloudflare.zoneStatus !== 'active' && cloudflare.nameServers?.length) {

@@ -105,6 +105,7 @@ describe('platform bootstrap V2', () => {
     let creates = 0
     const api = async (method: string, path: string, body?: any) => {
       if (method === 'GET' && path.startsWith('/zones?')) return existing ? [existing] : []
+      if (method === 'GET' && path === '/zones/' + existing?.id) return existing
       if (method === 'GET' && path.startsWith('/accounts?')) return [{ id }]
       if (method === 'POST' && path === '/zones') {
         creates++
@@ -121,6 +122,26 @@ describe('platform bootstrap V2', () => {
     expect(creates).toBe(1)
     await expect(discoverCloudflareIds(async (_m: string, p: string) => p.startsWith('/accounts?') ? [{ id }, { id: 'c'.repeat(32) }] : [], setup.site.domain, {}, true)).rejects.toThrow('Ambiguous')
     await expect(discoverCloudflareIds(api, 'another.example', { zoneId: 'c'.repeat(32) }, true)).rejects.toThrow()
+  })
+
+  it('确认旧 Zone 属于其他域名后创建新 Zone，无法核实时不创建', async () => {
+    const oldId = 'c'.repeat(32)
+    let created = 0
+    const api = async (method: string, path: string, body?: any) => {
+      if (method === 'GET' && path === '/zones/' + oldId) return { id: oldId, name: 'old.example', account: { id } }
+      if (method === 'GET' && path.startsWith('/zones?')) return []
+      if (method === 'GET' && path.startsWith('/accounts?')) return [{ id }]
+      if (method === 'POST' && path === '/zones') {
+        created++
+        return { name: body.name, id: 'b'.repeat(32), account: body.account, status: 'pending', name_servers: ['new.ns.cloudflare.com'] }
+      }
+      throw new Error('unexpected request')
+    }
+    const result = await discoverCloudflareIds(api, 'new.example', { accountId: id, zoneId: oldId, zoneStatus: 'active', nameServers: ['old.ns.cloudflare.com'] }, true)
+    expect(result).toMatchObject({ zoneId: 'b'.repeat(32), zoneStatus: 'pending', nameServers: ['new.ns.cloudflare.com'] })
+    expect(created).toBe(1)
+    await expect(discoverCloudflareIds(async () => { throw new Error('not accessible') }, 'new.example', { zoneId: oldId }, true)).rejects.toThrow('not accessible')
+    expect(created).toBe(1)
   })
 
   it('Zone 创建后即使后续步骤失败，也保留 ID 并输出分配的 nameserver', async () => {

@@ -368,11 +368,8 @@ export function main(argv = process.argv.slice(2), deps = {}) {
         }
         throw new Error('D1/KV still have placeholder IDs in wrangler.jsonc')
       }
-      // Optional V2: when the user enabled platform APIs, provision them
-      // before payment and runtime secret sync, without publishing the Worker.
-      const platforms = setup.platforms ?? {}
-      const enabled = Boolean(platforms.cloudflare?.turnstile || platforms.cloudflare?.analytics || platforms.resend?.enabled || setup.email?.routing?.enabled)
-      if (enabled) {
+      // 先处理站点 Zone 和可选平台资源，再处理支付与运行密钥。
+      {
         const result = runNode(['scripts/bootstrap-platforms.mjs', '--apply', '--config', options.setupFile, '--wrangler', options.wranglerFile])
         const nameservers = result.output.match(/^CLOUDFLARE_NAMESERVERS=([a-z0-9.,-]+)\s*$/im)?.[1]
         if (nameservers) {
@@ -443,7 +440,8 @@ export function main(argv = process.argv.slice(2), deps = {}) {
         log('D1 migrations 已应用')
       }
       // Auto-update DNS nameservers if Spaceship credentials are available
-      const cloudflareConfig = setup.platforms?.cloudflare
+      // 平台初始化可能已替换旧站 Zone，读取最新配置。
+      const cloudflareConfig = JSON.parse(read(options.setupFile)).platforms?.cloudflare
       if (cloudflareConfig?.nameServers && cloudflareConfig.nameServers.length > 0 && cloudflareConfig.zoneStatus !== 'active') {
         const domain = setup.site?.domain || site.domain
         // Load Spaceship credentials from .dev.vars.platform

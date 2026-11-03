@@ -14,6 +14,8 @@
 
 ## 各配置文件的职责
 
+`npm run setup -- --apply` 会查找或创建站点的 Cloudflare Zone，即使没有开启可选平台功能。配置中的旧 Zone 若可验证属于其他域名，会保留账号并替换旧 Zone 信息；旧 Zone 不可访问或账号冲突时停止，不会盲目创建。创建 Zone 需要相应的账号与 Zone 编辑权限。
+
 | 文件 | 配置内容 |
 | --- | --- |
 | `site.setup.json` | 公开的站点初始化选择：`site.adminEmail`、`google.clientId`、`payment`、`video.provider`、`moderation.provider`、`email.from`、`email.loginEnabled` 和平台功能开关；不放密钥 |

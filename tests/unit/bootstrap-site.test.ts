@@ -6,12 +6,13 @@ import {
   updatePublicVar, updateResourceId, validateSetup, normalizeSetup, patchTestPayment,
 } from '../../scripts/bootstrap-site.mjs'
 import { checkPublicConfig } from '../../scripts/pre-deploy.mjs'
+import { site } from '../../src/config/site'
 
 // 测试独立于本机已创建的生产资源 ID。
 const raw = updatePublicVar(updateResourceId(updateResourceId(readFileSync('wrangler.jsonc', 'utf8').replace(/("name"\s*:\s*)"[^"]+"/, '$1"tinydeskai"'), 'd1', '00000000-0000-0000-0000-000000000000'), 'kv', '00000000000000000000000000000000'), 'WAFFO_PRODUCTS', '{}')
 const { config } = ts.parseConfigFileTextToJson('wrangler.jsonc', raw)
 const setup = {
-  site: { name: 'tinydeskai', domain: 'tinydeskai.website', adminEmail: 'admin@example.com' },
+  site: { name: 'tinydeskai', domain: site.domain, adminEmail: 'admin@example.com' },
   google: { clientId: 'test.apps.googleusercontent.com' },
   payment: { provider: 'waffo', environment: 'test', storeId: '', createProducts: false },
   secrets: { sync: false },
@@ -240,6 +241,7 @@ describe('bootstrap-site', () => {
     const vars = ts.parseConfigFileTextToJson('wrangler.jsonc', stored).config.vars
     expect(vars.EMAIL_LOGIN_ENABLED).toBe('true')
     expect(JSON.parse(vars.WAFFO_PRODUCTS)).toEqual({ starter: 'a', party: 'b', squad: 'c' })
+    expect(calls.some((args) => args[0] === 'scripts/bootstrap-platforms.mjs' && args.includes('--apply'))).toBe(true)
     expect(calls.find((args) => args[0] === 'scripts/waffo-setup.mjs')).toContain('--prod')
     expect(calls.some((args) => args[0] === 'scripts/setup-www-redirect.mjs')).toBe(true)
     expect(mock.state.commands.some((command) => command.includes('migrations'))).toBe(false)
