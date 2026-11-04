@@ -30,7 +30,7 @@ function priceOf(cents: number) {
 }
 
 // 首页：组织 + 网站 + 应用（全部积分包汇总成 AggregateOffer）+ 示例视频
-export function homeJsonLd(locale: Locale, description: string, video: { name: string; description: string }) {
+export function homeJsonLd(locale: Locale, description: string, video: { name: string; description: string; uploadDate?: string }) {
   const prices = site.packages.map((p) => p.priceCents)
   const sample = defaultStyle.examples.madeWith
   return {
@@ -63,7 +63,7 @@ export function homeJsonLd(locale: Locale, description: string, video: { name: s
               description: video.description,
               thumbnailUrl: absoluteUrl(sample.poster),
               contentUrl: absoluteUrl(sample.video),
-              uploadDate: `${site.seo.publishedAt}T00:00:00+00:00`,
+              ...(video.uploadDate ? { uploadDate: video.uploadDate } : {}),
               inLanguage: htmlLang(locale),
             },
           ]

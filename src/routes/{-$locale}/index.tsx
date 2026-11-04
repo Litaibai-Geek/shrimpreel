@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { ArrowRight, Camera, Check, Clock, Coins, Film, Flame, ShieldCheck, Smartphone, X } from 'lucide-react'
 import { Faq, faqJsonLd } from '#/components/Faq'
 import { Generator } from '#/components/Generator'
+import { ExampleComparison } from '#/components/ExampleComparison'
 import { Pricing } from '#/components/Pricing'
 import { VideoCard } from '#/components/VideoCard'
 import { LocalLink } from '#/components/ui'
@@ -22,7 +23,7 @@ export const Route = createFileRoute('/{-$locale}/')({
     return {
       ...head,
       scripts: [
-        jsonLdScript(homeJsonLd(locale, c.meta.homeDescription, { name: `${c.hero.aiVersion} – ${site.keyword}`, description: c.madeWith.body })),
+        jsonLdScript(homeJsonLd(locale, c.meta.homeDescription, { name: `${c.madeWith.resultLabel} – ${site.keyword}`, description: c.madeWith.body })),
         jsonLdScript(faqJsonLd(c.faq.items)),
       ],
     }
@@ -99,10 +100,10 @@ function Home() {
                 })}
               </div>
             ) : null}
-            <div
-              className="grid grid-cols-3 gap-3 sm:gap-4"
-              {...(STYLES.length > 1 ? { id: 'hero-panel', role: 'tabpanel', 'aria-labelledby': `hero-tab-${style.id}` } : {})}
-            >
+            <div {...(STYLES.length > 1 ? { id: 'hero-panel', role: 'tabpanel', 'aria-labelledby': `hero-tab-${style.id}` } : {})}>
+              {!heroClips.length && style.examples.madeWith.photo && style.examples.madeWith.video && style.examples.madeWith.poster ? (
+                <ExampleComparison {...style.examples.madeWith} />
+              ) : <div className="grid grid-cols-3 gap-3 sm:gap-4">
               {heroClips.length ? (
                 heroClips.map((clip, index) => (
                   <VideoCard
@@ -125,6 +126,7 @@ function Home() {
                   </figure>
                 ))
               )}
+              </div>}
             </div>
             <div className="flex flex-wrap justify-center gap-2">
               {c.hero.chips.map((chip) => (

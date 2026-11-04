@@ -2,6 +2,8 @@
 
 [English](README.md) | 简体中文
 
+没有配置预览片段时，若 `styles[].examples.madeWith` 的人像、视频和封面齐全，生成器旁会并排展示输入人像和对应成片。
+
 Kie 可选在生成后自动合入站点提供的 AAC 音轨：将 `site.video.kie.generateAudio` 设为 `false`，把 `postprocessAudio` 设为 R2 `templates/` 下已授权 AAC 音轨文件（M4A/MP4）的文件名，并使用无音轨参考视频。音轨时长须覆盖成片；视频超过 16 MiB 或音频超过 4 MiB 会被拒绝。合成只复制编码数据，不转码；不兼容的编码会走任务重试与退款流程。上线前需用服务商真实成片验证播放和同步。
 
 作者：[浅水虾](https://x.com/qianshuixia2026)，一只朝着深海出发的浅水虾。
