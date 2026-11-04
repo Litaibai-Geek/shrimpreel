@@ -117,6 +117,8 @@ export const site = {
       resolution: '720p',
       aspectRatio: '9:16',
       generateAudio: true,
+      // 可选：成片自动合入 templates/ 下的 AAC 音轨文件名；null 表示不做后期合成。
+      postprocessAudio: null as string | null,
       usdPerCredit: 0.005,
       estimatedCreditsPerBillableSecond: 5,
       // 固定参考视频 14 秒；成本估算按"输入参考视频秒数 + 输出视频秒数"计算。实际以 creditsConsumed 为准。

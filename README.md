@@ -2,6 +2,8 @@
 
 English | [简体中文](README.zh-CN.md)
 
+Kie can optionally attach a site-provided AAC track after generation: set `site.video.kie.generateAudio` to `false`, set `postprocessAudio` to the filename of an authorized AAC-in-M4A/MP4 asset in R2 `templates/`, and provide a silent reference video. The track must cover the generated video; files over 16 MiB for video or 4 MiB for audio are rejected. This copies encoded tracks without transcoding; unsupported codecs follow the normal retry/refund process. Verify playback and timing with a real provider output before launch.
+
 Built by [浅水虾 (qianshuixia)](https://x.com/qianshuixia2026).
 
 An open-source template for "one photo → an AI video that follows a viral template" SaaS sites. Every trending keyword gets its own site: create a repo from this template, change the config, copy and media, and ship. Everything runs on Cloudflare: Workers + D1 + R2 + KV + Queues + Rate Limiting + Cron Triggers.

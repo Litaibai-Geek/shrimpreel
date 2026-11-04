@@ -1,4 +1,5 @@
 import { DatabaseSync } from 'node:sqlite'
+import { readFile } from 'node:fs/promises'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { handleVideoJob } from '#/server/jobs'
 import { getVideoProvider } from '#/server/video'
@@ -51,6 +52,34 @@ describe('jobs：多步任务进入下一步', () => {
     await handleVideoJob(env, { kind: 'poll', generationId: 'gen_1' })
     expect(row()).toEqual({ status: 'processing', provider_request_id: 'job_v', provider_meta: '{"stage":"video"}' })
     expect(sent).toEqual([])
+  })
+})
+
+describe('jobs：成片自动合成音轨', () => {
+  it('合成后保存结果并标记成功', async () => {
+    const video = await readFile(new URL('../fixtures/audio-mux/video.mp4', import.meta.url))
+    const audio = await readFile(new URL('../fixtures/audio-mux/audio.m4a', import.meta.url))
+    const put = vi.fn(async () => {})
+    env.MEDIA = {
+      get: async (key: string) => {
+        const data = key === 'templates/audio.m4a' ? audio : video
+        return { size: data.length, body: new Response(data).body }
+      },
+      put,
+    } as unknown as R2Bucket
+    sqlite.prepare("UPDATE generations SET provider = 'kie', provider_meta = ? WHERE id = 'gen_1'").run(JSON.stringify({ postprocessAudio: 'audio.m4a' }))
+    status.mockResolvedValue({ state: 'completed', output: { r2Key: 'source.mp4' }, costCents: 10 })
+    await handleVideoJob(env, { kind: 'poll', generationId: 'gen_1' })
+    expect(put).toHaveBeenCalledOnce()
+    expect(sqlite.prepare('SELECT status, provider_cost_cents FROM generations WHERE id = ?').get('gen_1')).toEqual({ status: 'succeeded', provider_cost_cents: 10 })
+  })
+
+  it('音轨暂时不可用时保留处理状态和成本，交给队列重试', async () => {
+    env.MEDIA = { get: async () => null } as unknown as R2Bucket
+    sqlite.prepare("UPDATE generations SET provider = 'kie', provider_meta = ? WHERE id = 'gen_1'").run(JSON.stringify({ postprocessAudio: 'missing.m4a' }))
+    status.mockResolvedValue({ state: 'completed', output: { r2Key: 'source.mp4' }, costCents: 10 })
+    await expect(handleVideoJob(env, { kind: 'poll', generationId: 'gen_1' })).rejects.toThrow('音轨不存在')
+    expect(sqlite.prepare('SELECT status, provider_cost_cents FROM generations WHERE id = ?').get('gen_1')).toEqual({ status: 'processing', provider_cost_cents: 10 })
   })
 })
 

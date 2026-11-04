@@ -1,4 +1,4 @@
-import { findDuration, findStyle } from '#/config/site'
+import { findDuration, findStyle, site } from '#/config/site'
 import { isBandUploadIds } from '#/lib/band'
 import { jobToken, signedUploadUrl, templateSourceUrl } from './media'
 import { expireStatements, generationRefundStatements } from './credits'
@@ -10,11 +10,33 @@ import { grantDueSubscriptions } from './subscriptions'
 import { nowIso } from './util'
 import { getVideoProvider } from './video'
 import { VideoProviderError } from './video/types'
+import { MAX_MUX_AUDIO_BYTES, MAX_MUX_VIDEO_BYTES, muxAudio } from './audio-mux'
 
 const JOB_TIMEOUT_MINUTES = 45
 // 成片大小上限：带 Content-Length 时直接流式写入 R2，不占 Worker 内存；没带时只能边读边缓存，上限更低（Worker 内存 128 MB）
 export const MAX_OUTPUT_BYTES = 100 * 1024 * 1024
 export const MAX_BUFFERED_OUTPUT_BYTES = 48 * 1024 * 1024
+
+async function readLimited(body: ReadableStream<Uint8Array> | null, limit: number): Promise<Uint8Array> {
+  if (!body) throw new Error('媒体响应没有内容')
+  const reader = body.getReader()
+  const chunks: Uint8Array[] = []
+  let size = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    size += value.byteLength
+    if (size > limit) {
+      await reader.cancel()
+      throw new Error('媒体文件超过合成大小限制')
+    }
+    chunks.push(value)
+  }
+  const bytes = new Uint8Array(size)
+  let offset = 0
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength }
+  return bytes
+}
 
 // 把服务商给的成片地址存进 R2；超过上限返回 false（调用方判失败、退积分），不把超大文件读进内存
 export async function storeOutputFromUrl(
@@ -153,6 +175,23 @@ async function submitGeneration(env: Env, generation: GenerationRow) {
   // 签名在 try 里：生产环境 SESSION_SECRET 配错时会抛错，要和提交失败一样放回 queued，交给队列重试和死信退款
   let providerRequestId: string | null = null
   try {
+    // 固定每次任务使用的音轨，避免配置变动影响已提交任务的轮询与重试。
+    if (generation.provider === 'kie' && site.video.kie.postprocessAudio) {
+      const audioName = site.video.kie.postprocessAudio
+      if (site.video.kie.generateAudio || !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(audioName)) {
+        await failGeneration(env, generation.id, 'audio_config_invalid', '音轨配置无效或未关闭模型音频生成')
+        return
+      }
+      const audio = await env.MEDIA.head(`templates/${audioName}`)
+      if (!audio || audio.size > MAX_MUX_AUDIO_BYTES || audio.size === 0) {
+        await failGeneration(env, generation.id, 'audio_missing', '音轨不存在或超过大小限制')
+        return
+      }
+      baseMeta.postprocessAudio = audioName
+      // 提交结果可能丢失，回调恢复任务 ID 时仍需知道原定音轨。
+      await env.DB.prepare("UPDATE generations SET provider_meta = ? WHERE id = ? AND status = 'processing'")
+        .bind(JSON.stringify(baseMeta), generation.id).run()
+    }
     const webhookUrl = new URL(`/api/webhooks/${provider.id}`, env.SITE_URL)
     webhookUrl.searchParams.set('gen', generation.id)
     webhookUrl.searchParams.set('token', await jobToken(env, generation.id))
@@ -251,8 +290,30 @@ async function pollGeneration(env: Env, generation: GenerationRow) {
     return
   }
 
+  const costCents = status.costCents ?? provider.costCents(generation.duration_seconds, generation.template_id)
+  // 服务商已经完成并可能收费，即使后续合成失败退款，也要保留真实成本。
+  await env.DB.prepare('UPDATE generations SET provider_cost_cents = ? WHERE id = ? AND provider_cost_cents IS NULL')
+    .bind(costCents, generation.id).run()
   const outputKey = `outputs/${generation.user_id}/${generation.id}.mp4`
-  if ('url' in status.output) {
+  const audioName = parseMeta(generation.provider_meta).postprocessAudio
+  if (generation.provider === 'kie' && typeof audioName === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(audioName)) {
+    const audio = await env.MEDIA.get(`templates/${audioName}`)
+    if (!audio || audio.size > MAX_MUX_AUDIO_BYTES) throw new Error('合成音轨不存在或超过大小限制')
+    let videoBytes: Uint8Array
+    if ('url' in status.output) {
+      const response = await fetch(status.output.url)
+      if (!response.ok) throw new Error(`download output failed: HTTP ${response.status}`)
+      videoBytes = await readLimited(response.body, MAX_MUX_VIDEO_BYTES)
+    } else {
+      const object = await env.MEDIA.get(status.output.r2Key)
+      if (!object || object.size > MAX_MUX_VIDEO_BYTES) throw new Error('成片不存在或超过合成大小限制')
+      videoBytes = await readLimited(object.body, MAX_MUX_VIDEO_BYTES)
+    }
+    const mixed = await muxAudio(videoBytes, await readLimited(audio.body, MAX_MUX_AUDIO_BYTES))
+    await env.MEDIA.put(outputKey, mixed, { httpMetadata: { contentType: 'video/mp4' } })
+  } else if (audioName != null && generation.provider === 'kie') {
+    throw new Error('合成音轨文件名无效')
+  } else if ('url' in status.output) {
     if (!(await storeOutputFromUrl(env, status.output.url, outputKey))) {
       await failGeneration(env, generation.id, 'output_too_large', 'Provider output exceeds the size limit')
       return
@@ -266,7 +327,6 @@ async function pollGeneration(env: Env, generation: GenerationRow) {
     await env.MEDIA.put(outputKey, await source.arrayBuffer(), { httpMetadata: { contentType: 'video/mp4' } })
   }
   const now = nowIso()
-  const costCents = status.costCents ?? provider.costCents(generation.duration_seconds, generation.template_id)
   const saved = await env.DB.prepare(
     `UPDATE generations SET status = 'succeeded', output_r2_key = ?, provider_cost_cents = ?, completed_at = ?, updated_at = ?
      WHERE id = ? AND status = 'processing'`,

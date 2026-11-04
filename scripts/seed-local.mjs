@@ -12,7 +12,7 @@ const wrangler = (args) => execFileSync('npx', ['wrangler', ...args], { stdio: '
 wrangler(['d1', 'migrations', 'apply', 'DB', '--local'])
 
 const dir = join('seed', 'templates')
-const TYPES = { '.mp4': 'video/mp4', '.jpg': 'image/jpeg' }
+const TYPES = { '.mp4': 'video/mp4', '.jpg': 'image/jpeg', '.m4a': 'audio/mp4' }
 for (const file of readdirSync(dir)) {
   const type = TYPES[file.slice(file.lastIndexOf('.'))]
   if (!type) continue
