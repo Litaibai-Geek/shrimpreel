@@ -18,13 +18,19 @@ https://github.com/user-attachments/assets/895aab94-d0c9-474e-8d90-61a6c551e536
 
 站点公开配置在 `site.setup.json` 中管理，执行 `npm run setup -- --apply` 写入 `wrangler.jsonc`；缺少 Cloudflare Zone 时可自动创建并输出 nameserver，切换前须核对和迁移 DNS 记录。接着运行数据库迁移并部署。这些命令在未设置环境变量时使用 `.dev.vars.platform` 中的 Cloudflare Token。部署前会检查配置是否同步，不会用运行密钥文件覆盖 Wrangler 配置。
 
+初始化会检查并上传所选视频服务商需要的 `seed/templates/` 素材到生产 R2，核对已有文件并拒绝覆盖不同内容；可用 `npm run seed:remote -- --verify` 单独核验。创建新站时必须让 `site.styles` 指向实际素材。Cloudflare 账号级令牌不支持 Turnstile 时，在 `.dev.vars.platform` 配置具有 Turnstile 写权限的用户级 `CLOUDFLARE_USER_API_TOKEN`。
+
+`new-site.mjs` 为新站配置生产环境、自定义域名路由，并关闭 `workers.dev` 和预览地址；遇到无法安全迁移的已有复杂路由时会停止。正式绑定由后续部署创建。
+
+Spaceship Basic DNS 没有自定义记录且 DNSSEC 检查通过时可自动切换 nameserver；存在记录、DS 或无法确认时停止，需先安全迁移。公共 DNS 查询不等于 Zone 已激活，待 Cloudflare 激活后重跑初始化以完成邮件路由。
+
 初始化会核实旧 Zone 是否属于其他域名，再自动替换旧站配置；旧 Zone 无法访问或账号冲突时会停止。
 
 初始化通过 Cloudflare 重定向规则将 www 永久跳转到根域名，保留路径、查询参数和请求方法；Token 需要 DNS 和重定向规则权限。
 
 在 `.dev.vars.production` 填写 `GA4_MEASUREMENT_ID=G-...`，下次部署构建前会同步到站点配置；该公开标识不会作为 Worker secret 上传，留空则关闭 GA4。
 
-上线依次执行 `npm run setup -- --apply`、`npm run db:migrate:remote`、`npm run deploy`。部署前自动运行 doctor、类型检查、单元测试和构建。迁移现有生产数据库前应备份；外部 DNS、支付回调、参考视频和邮件投递仍需配置并验收。
+上线依次执行 `npm run setup -- --apply`、`npm run db:migrate:remote`、`npm run deploy`。部署前自动运行 doctor、生产素材核验、类型检查、单元测试和构建。迁移现有生产数据库前应备份；外部 DNS、支付回调、参考视频和邮件投递仍需配置并验收。
 
 收件转发可在 `site.setup.json` 的 `email.routing` 设置 `enabled: true` 和 `destination`；默认将 `site.adminEmail` 转发至目标邮箱，也可用 `source` 指定本站地址。首次运行 `npm run setup -- --apply` 后，按 Cloudflare 邮件完成目标邮箱验证，再重跑相同命令创建规则并启用路由。需要 Cloudflare 邮件路由地址、规则和 Zone 设置的读写权限；若已有其他服务商的 MX 或冲突规则，脚本会停止并保留现有配置。初始化结束后仍需实际验证投递。
 

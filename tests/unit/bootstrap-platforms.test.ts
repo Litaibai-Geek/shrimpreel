@@ -9,6 +9,17 @@ const setup = { site: { domain: 'tinydeskai.website' },
   platforms: { cloudflare: { accountId: id, turnstile: true, analytics: true } } }
 
 describe('platform bootstrap V2', () => {
+  it('Zone 未激活时延后邮件路由，并用单独的用户令牌配置 Turnstile', async () => {
+    const configured = { site: setup.site, email: { routing: { enabled: true, source: 'support@tinydeskai.website', destination: 'owner@example.com' } }, platforms: { cloudflare: { accountId: id, zoneId: id, zoneStatus: 'pending', turnstile: true } } }
+    const logs: string[] = []
+    const cf = async () => { throw new Error('不应在待激活时配置邮件') }
+    const turnstileCf = async (_method: string, path: string) => path.includes('?page=')
+      ? [{ name: 'site-' + setup.site.domain + '-login', domains: [setup.site.domain], sitekey: 'sitekey' }]
+      : { domains: [setup.site.domain], sitekey: 'sitekey', secret: 'secret' }
+    await runProvisioning({ setup: configured, current: { wrangler: '{"TURNSTILE_SITE_KEY":""}', siteCode: '', secrets: 'TURNSTILE_SECRET_KEY=\n' }, apply: true, cf, turnstileCf, resend: null, log: (line: string) => logs.push(line) })
+    expect(logs.join('\n')).toContain('EMAIL_ROUTING_DEFERRED=')
+    expect(logs.join('\n')).toContain('Turnstile: verified')
+  })
   it('邮件地址未验证时只创建目标地址，不启用 MX；验证后可重试且不会重复创建规则', async () => {
     let target: any = null, rule: any = null, enabled = false
     const writes: string[] = []

@@ -18,6 +18,12 @@ Preview videos play muted by default; use each video's controls to turn sound on
 
 Public site settings are managed in `site.setup.json` and written to `wrangler.jsonc` by `npm run setup -- --apply`. Setup can create a missing Cloudflare zone and show its nameservers; review and migrate DNS records before changing the registrar settings. Run database migrations next, then deploy; these commands use the Cloudflare token in `.dev.vars.platform` when no token is set in the environment. The deployment check does not overwrite Wrangler settings from the runtime secrets file.
 
+Setup checks and uploads the configured video provider's required `seed/templates/` files to production R2, reuses matching objects and refuses to overwrite different content. Deployment runs the same check in read-only mode; use `npm run seed:remote -- --verify` to run it separately. New sites must point `site.styles` to actual assets. When using an account-owned Cloudflare token, set a user-owned `CLOUDFLARE_USER_API_TOKEN` with Turnstile write permission in `.dev.vars.platform`.
+
+`new-site.mjs` configures the production environment and a custom-domain route for a new site, with `workers.dev` and preview URLs disabled. It stops if an existing complex route cannot be migrated safely; deployment creates the actual domain binding.
+
+Spaceship Basic DNS can switch automatically only when there are no custom records and the DNSSEC check succeeds. Existing records, DS records, or an unverifiable state stop the switch. A DNS response does not prove the zone is active; rerun setup after Cloudflare activates it to finish email routing.
+
 Setup checks an existing zone ID before replacing old-site settings; it stops if the zone cannot be accessed or its account conflicts.
 
 Setup configures a permanent www-to-apex redirect using Cloudflare redirect rules, retaining the path, query string and request method. The Cloudflare token needs DNS and redirect-rule permissions.

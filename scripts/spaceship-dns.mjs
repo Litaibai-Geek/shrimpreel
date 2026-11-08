@@ -3,7 +3,15 @@
  * 由 bootstrap-site.mjs 调用，自动更新 nameserver 到 Cloudflare
  */
 
+import { resolveNs } from 'node:dns/promises'
+
 const SPACESHIP_API = 'https://spaceship.dev/api/v1'
+
+function sameNameservers(actual, expected) {
+  const normalize = (items) => new Set(items.map((item) => item.toLowerCase().replace(/\.$/, '')))
+  const a = normalize(actual), b = normalize(expected)
+  return b.size > 0 && a.size === b.size && [...b].every((name) => a.has(name))
+}
 
 /**
  * 调用 Spaceship API
@@ -23,10 +31,10 @@ export async function spaceshipRequest(path, { apiKey, apiSecret, method = 'GET'
 
   const response = await fetch(url, options)
   if (!response.ok) {
-    const text = await response.text()
-    throw new Error(`Spaceship API error: ${response.status} ${text}`)
+    throw new Error(`Spaceship API HTTP ${response.status}`)
   }
 
+  if (response.status === 204) return null
   return response.json()
 }
 
@@ -35,11 +43,11 @@ export async function spaceshipRequest(path, { apiKey, apiSecret, method = 'GET'
  */
 export async function getCurrentNameservers(domain, apiKey, apiSecret) {
   try {
-    const data = await spaceshipRequest(`/domains/${encodeURIComponent(domain)}/nameservers`, {
+    const data = await spaceshipRequest(`/domains/${encodeURIComponent(domain)}`, {
       apiKey,
       apiSecret,
     })
-    return data.hosts || []
+    return data.nameservers?.hosts || []
   } catch (error) {
     // 如果 404，可能域名不在这个账号中
     if (error.message.includes('404')) {
@@ -64,7 +72,7 @@ export async function updateNameservers(domain, nameServers, apiKey, apiSecret) 
 /**
  * 检查 nameserver 是否已经生效（通过公共 DNS 查询）
  */
-export async function checkNameserversPropagation(domain, expectedNameservers) {
+export async function checkNameserversPropagation(domain, expectedNameservers, systemResolveNs = resolveNs) {
   const endpoints = [
     `https://cloudflare-dns.com/dns-query?name=${domain}&type=NS`,
     `https://dns.google/resolve?name=${domain}&type=NS`,
@@ -72,31 +80,35 @@ export async function checkNameserversPropagation(domain, expectedNameservers) {
 
   const results = []
   for (const url of endpoints) {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 5000)
     try {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 5000) // 5秒超时
-
       const response = await fetch(url, {
         headers: { 'Accept': 'application/dns-json' },
         signal: controller.signal
       })
-      clearTimeout(timeoutId)
-
+      if (!response.ok) continue
       const data = await response.json()
-      const nameservers = data.Answer?.map(record => record.data.toLowerCase().replace(/\.$/, '')) || []
-      results.push(...nameservers)
+      const nameservers = data.Answer?.filter(record => record.type === undefined || record.type === 2).map(record => record.data.toLowerCase().replace(/\.$/, '')) || []
+      if (nameservers.length) results.push(nameservers)
     } catch (error) {
       // Fetch 失败时忽略，继续下一个端点
       continue
+    } finally {
+      clearTimeout(timeoutId)
     }
   }
 
-  const publicNameservers = new Set(results)
-  const expected = new Set(expectedNameservers.map(ns => ns.toLowerCase()))
+  if (!results.length) {
+    try {
+      const nameservers = await systemResolveNs(domain)
+      if (nameservers.length) results.push(nameservers)
+    } catch {}
+  }
 
   return {
-    propagated: expected.size > 0 && [...expected].every(ns => publicNameservers.has(ns)),
-    current: [...publicNameservers],
+    propagated: results.some((nameservers) => sameNameservers(nameservers, expectedNameservers)),
+    current: [...new Set(results.flat())],
   }
 }
 
@@ -129,10 +141,7 @@ export async function autoUpdateAndWaitForDNS(
   try {
     // 1. 检查当前公共 DNS 的 nameserver（不查询 Spaceship API）
     log('正在检查当前 DNS 状态...')
-    const { current: currentPublicNS } = await checkNameserversPropagation(domain, nameServers)
-    const currentSet = new Set(currentPublicNS.map(ns => ns.toLowerCase()))
-    const targetSet = new Set(nameServers.map(ns => ns.toLowerCase()))
-    const alreadyCorrect = targetSet.size > 0 && [...targetSet].every(ns => currentSet.has(ns))
+    const { current: currentPublicNS, propagated: alreadyCorrect } = await checkNameserversPropagation(domain, nameServers)
 
     if (alreadyCorrect) {
       log('✓ DNS 已经是 Cloudflare nameserver，无需更新')
@@ -140,10 +149,28 @@ export async function autoUpdateAndWaitForDNS(
       return true
     }
 
-    log(`  当前公共 DNS：${currentPublicNS.length > 0 ? currentPublicNS.join(', ') : '尚未传播'}`)
+    log(`  当前 DNS 查询：${currentPublicNS.length > 0 ? currentPublicNS.join(', ') : '无法获取结果'}`)
     log(`  目标 nameserver：${nameServers.join(', ')}`)
 
-    // 2. 直接更新 nameserver（不先查询 Spaceship）
+    // 只能确认 Spaceship Basic DNS 的完整记录；其他 DNS 服务不能安全迁移。
+    const domainInfo = await spaceshipRequest(`/domains/${encodeURIComponent(domain)}`, { apiKey, apiSecret })
+    if (sameNameservers(domainInfo.nameservers?.hosts ?? [], nameServers)) {
+      log('注册商已配置目标 nameserver；DNS 查询尚未确认，请稍后重试。')
+      return false
+    }
+    if (domainInfo.nameservers?.provider !== 'basic') throw new Error('当前并非 Spaceship Basic DNS，无法确认现有 DNS 记录')
+    const records = await spaceshipRequest(`/dns/records/${encodeURIComponent(domain)}?take=1&skip=0`, { apiKey, apiSecret })
+    if (!Array.isArray(records.items) || !Number.isInteger(records.total)) throw new Error('无法确认现有 DNS 记录')
+    if (records.total !== 0) throw new Error('现有 DNS 包含记录，自动切换前必须先迁移并核对')
+    let dsResponse
+    try {
+      dsResponse = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(domain)}&type=DS`, { headers: { Accept: 'application/dns-json' }, signal: AbortSignal.timeout(10000) })
+    } catch { throw new Error('无法查询 DNSSEC 状态，拒绝自动切换') }
+    if (!dsResponse.ok) throw new Error('无法验证 DNSSEC 状态')
+    const ds = await dsResponse.json()
+    if (ds.Status !== 0 || ds.Answer?.some(record => record.type === 43)) throw new Error('域名存在 DNSSEC DS 记录或状态无法验证，拒绝自动切换')
+
+    // 2. 确认旧 DNS 没有自定义记录且 DNSSEC 不会阻断解析后再切换。
     log('正在通过 Spaceship API 更新 nameserver...')
     await updateNameservers(domain, nameServers, apiKey, apiSecret)
     log('✓ 已提交 nameserver 更新到 Spaceship')
@@ -174,14 +201,14 @@ export async function autoUpdateAndWaitForDNS(
       const { propagated, current: publicNS } = await checkNameserversPropagation(domain, nameServers)
 
       if (propagated) {
-        log(`✓ DNS 已全球传播（耗时 ${elapsed} 秒）`)
+        log(`✓ DNS 查询已返回目标 nameserver（耗时 ${elapsed} 秒）`)
         log(`  公共 DNS 查询：${publicNS.join(', ')}`)
         return true
       }
 
       // 未传播，显示进度
       const progress = `[${elapsed}s/${maxWaitSeconds}s]`
-      const status = publicNS.length > 0 ? `检测到: ${publicNS.join(', ')}` : '尚未传播'
+      const status = publicNS.length > 0 ? `检测到: ${publicNS.join(', ')}` : '无法获取 DNS 查询结果'
       log(`  ${progress} 第 ${attempt} 次检查：${status}`)
     }
   } catch (error) {

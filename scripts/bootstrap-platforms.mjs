@@ -263,19 +263,32 @@ export function setRuntimeSecret(source, key, value) {
   return regex.test(source) ? source.replace(regex, key + '=' + value) : source.trimEnd() + '\n' + key + '=' + value + '\n'
 }
 
-export async function runProvisioning({ setup, current, apply, cf, resend, log, saveSecrets = /** @type {(value: string) => void} */ (() => {}) }) {
+export async function runProvisioning({ setup, current, apply, cf, turnstileCf = cf, resend, log, saveSecrets = /** @type {(value: string) => void} */ (() => {}) }) {
   const { domain, cloudflare, resend: email } = platformConfig(setup)
   let turnstile = null, analytics = null, resendData = null
   let secrets = current.secrets
   if (setup.email?.routing?.enabled) {
     if (!cf) throw new Error('Cloudflare administrator token required')
     const routing = setup.email.routing
-    const state = await provisionEmailRouting(cf, cloudflare.accountId, cloudflare.zoneId, domain, routing.source || setup.site.adminEmail, routing.destination, apply, log)
-    log(state === 'pending' ? 'EMAIL_ROUTING_PENDING=请在目标邮箱验证 Cloudflare 邮件，然后重新运行 npm run setup -- --apply' : 'EMAIL_ROUTING_READY=邮件转发规则和 Cloudflare 路由已就绪')
+    if (apply && cloudflare.zoneStatus === 'pending') {
+      log('EMAIL_ROUTING_DEFERRED=Zone 尚未激活，邮件路由将在域名切换后配置')
+    } else {
+      let state
+      try {
+        state = await provisionEmailRouting(cf, cloudflare.accountId, cloudflare.zoneId, domain, routing.source || setup.site.adminEmail, routing.destination, apply, log)
+      } catch (error) {
+        throw new Error('配置 Cloudflare 邮件路由失败：' + (error instanceof Error ? error.message : '未知错误'))
+      }
+      log(state === 'pending' ? 'EMAIL_ROUTING_PENDING=请在目标邮箱验证 Cloudflare 邮件，然后重新运行 npm run setup -- --apply' : 'EMAIL_ROUTING_READY=邮件转发规则和 Cloudflare 路由已就绪')
+    }
   }
   if (cloudflare.turnstile) {
     if (!cf) throw new Error('Cloudflare administrator token required')
-    turnstile = await provisionTurnstile(cf, cloudflare.accountId, domain, apply)
+    try {
+      turnstile = await provisionTurnstile(turnstileCf, cloudflare.accountId, domain, apply)
+    } catch (error) {
+      throw new Error('配置 Turnstile 失败：' + (error instanceof Error ? error.message : '未知错误') + '；请检查用户级 API Token 的 Turnstile 权限')
+    }
     // 在创建其他平台资源前验证公开配置，避免后续才发现不可覆盖的冲突。
     setSiteValues(current.wrangler, current.siteCode, turnstile, null)
     secrets = setRuntimeSecret(secrets, 'TURNSTILE_SECRET_KEY', turnstile.secret)
@@ -342,12 +355,14 @@ export async function main(args = process.argv.slice(2), overrides = {}) {
     }
     const vars = overrides.vars ?? loadPlatformEnv('.dev.vars.platform')
     const cf = vars.CLOUDFLARE_API_TOKEN ? createApiClient('https://api.cloudflare.com/client/v4', vars.CLOUDFLARE_API_TOKEN, overrides.fetcher) : null
+    const turnstileCf = vars.CLOUDFLARE_USER_API_TOKEN ? createApiClient('https://api.cloudflare.com/client/v4', vars.CLOUDFLARE_USER_API_TOKEN, overrides.fetcher) : cf
     const email = vars.RESEND_ADMIN_API_KEY ? createApiClient('https://api.resend.com', vars.RESEND_ADMIN_API_KEY, overrides.fetcher) : null
     {
       cloudflare = await discoverCloudflareIds(cf, domain, cloudflare, mode === '--apply')
       setup.platforms ??= {}
       setup.platforms.cloudflare = cloudflare
       log('Cloudflare account and zone discovered for ' + domain)
+      if (cloudflare.zoneStatus) log('CLOUDFLARE_ZONE_STATUS=' + cloudflare.zoneStatus)
       if (cloudflare.zoneStatus !== 'active' && cloudflare.nameServers?.length) {
         log('CLOUDFLARE_NAMESERVERS=' + cloudflare.nameServers.join(','))
         log('Zone 尚未激活；检查并迁移现有 DNS 记录后，在域名注册商更新 nameserver。')
@@ -365,7 +380,7 @@ export async function main(args = process.argv.slice(2), overrides = {}) {
       secrets: read(secretsFile, 'utf8'),
     }
     const write = overrides.write ?? writeFileSync
-    const result = await runProvisioning({ setup, current, apply: mode === '--apply', cf, resend: email, log,
+    const result = await runProvisioning({ setup, current, apply: mode === '--apply', cf, turnstileCf, resend: email, log,
       saveSecrets: (value) => write(secretsFile, value, { mode: 0o600 }) })
     if (mode === '--apply') {
       if (result.wrangler !== current.wrangler) write(wranglerFile, result.wrangler)

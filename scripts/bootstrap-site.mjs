@@ -241,6 +241,7 @@ export function planDescription(setup, config) {
     'Worker vars: SITE_URL, ADMIN_EMAILS, GOOGLE_CLIENT_ID, 支付、视频、审核和发信配置',
     'Waffo 商品: ' + (setup.payment?.createProducts ? '创建缺失商品（' + setup.payment.environment + '）' : '跳过（可在配置中开启）'),
     'Secrets: ' + (setup.secrets?.sync ? '尝试安全同步，不覆盖线上已有密钥' : '跳过'),
+    '生产 R2 素材: 检查已配置参考素材，补充缺失对象且不覆盖不同内容',
     'D1 migration: only with --with-migrations; deploy: never',
   ]
 }
@@ -368,6 +369,10 @@ export function main(argv = process.argv.slice(2), deps = {}) {
         }
         throw new Error('D1/KV still have placeholder IDs in wrangler.jsonc')
       }
+      // 模板素材必须先存在于生产 R2，否则首次生成会在扣积分后失败。
+      const media = runNode(['scripts/seed-remote.mjs', '--apply', '--config', options.wranglerFile])
+      if (!media.ok) throw new Error('生产模板素材未就绪，请运行 npm run seed:remote -- --verify 查看不含密钥的诊断')
+      log('生产模板素材已验证')
       // 先处理站点 Zone 和可选平台资源，再处理支付与运行密钥。
       {
         const result = runNode(['scripts/bootstrap-platforms.mjs', '--apply', '--config', options.setupFile, '--wrangler', options.wranglerFile])
@@ -378,14 +383,15 @@ export function main(argv = process.argv.slice(2), deps = {}) {
         }
         if (!result.ok) {
           const status = result.output.match(/Platform API (GET|POST|PATCH|PUT|DELETE) failed with HTTP (\d{3})/)
+          const step = result.output.includes('配置 Cloudflare 邮件路由失败') ? '邮件路由' : result.output.includes('配置 Turnstile 失败') ? 'Turnstile' : '平台'
           const diagnostic = status
-            ? `平台 API ${status[1]} 返回 HTTP ${status[2]}，请检查 Token 权限和平台资源状态`
+            ? `${step} API ${status[1]} 返回 HTTP ${status[2]}，请检查 Token 权限和平台资源状态`
             : result.output.includes('Cloudflare zone not found or inaccessible')
             ? 'Cloudflare 未找到站点域名或当前平台 Token 没有读取该 Zone 的权限'
             : '请运行 npm run setup:platforms -- --verify 查看只读诊断'
           throw new Error('V2 平台配置失败：' + diagnostic)
         }
-        const routingStatus = result.output.match(/^EMAIL_ROUTING_(?:PENDING|READY)=(.+)$/m)?.[1]
+        const routingStatus = result.output.match(/^EMAIL_ROUTING_(?:PENDING|READY|DEFERRED)=(.+)$/m)?.[1]
         if (routingStatus) log(routingStatus)
         updated = read(options.wranglerFile)
         log('跨平台 V2 资源已处理（未部署）')
@@ -435,7 +441,7 @@ export function main(argv = process.argv.slice(2), deps = {}) {
         log('Cloudflare Secrets 已同步（未覆盖已有值）')
       }
       if (options.withMigrations) {
-        const migration = runner(['d1','migrations','apply','DB','--remote','--yes'])
+        const migration = runner(['d1','migrations','apply','DB','--remote'])
         if (!migration.ok) throw new Error('Remote D1 migration failed; inspect the database before retrying')
         log('D1 migrations 已应用')
       }
@@ -452,15 +458,16 @@ export function main(argv = process.argv.slice(2), deps = {}) {
           if (exists(platformVarsPath)) {
             const parsed = parseDotenv(read(platformVarsPath))
             const platformEnv = Object.fromEntries(parsed.entries)
-            spaceshipKey = platformEnv.SPACESHIP_API_KEY
-            spaceshipSecret = platformEnv.SPACESHIP_API_SECRET
+            spaceshipKey ||= platformEnv.SPACESHIP_API_KEY
+            spaceshipSecret ||= platformEnv.SPACESHIP_API_SECRET
           }
         }
+        log('')
+        log('=== DNS 配置检查 ===')
+        const dns = await import('./spaceship-dns.mjs')
+        let dnsSuccess
         if (spaceshipKey && spaceshipSecret) {
-          log('')
-          log('=== 自动 DNS 配置 ===')
-          const { autoUpdateAndWaitForDNS } = await import('./spaceship-dns.mjs')
-          const dnsSuccess = await autoUpdateAndWaitForDNS(
+          dnsSuccess = await dns.autoUpdateAndWaitForDNS(
             domain,
             cloudflareConfig.nameServers,
             spaceshipKey,
@@ -469,12 +476,19 @@ export function main(argv = process.argv.slice(2), deps = {}) {
             1800, // 最长等待 30 分钟
             30    // 每 30 秒检查一次
           )
-          if (dnsSuccess) {
-            log('✓ DNS 配置完成，域名已激活')
-          }
+        } else {
+          dnsSuccess = (await dns.checkNameserversPropagation(domain, cloudflareConfig.nameServers)).propagated
+          if (!dnsSuccess) throw new Error('DNS 尚未确认目标 nameserver；请配置注册商凭据或先完成域名切换')
         }
+        if (!dnsSuccess) throw new Error('DNS 自动配置未完成，初始化尚未完成；请检查上方诊断后重试')
+        log('✓ DNS 查询已检测到 Cloudflare nameserver')
+        const resumed = runNode(['scripts/bootstrap-platforms.mjs', '--apply', '--config', options.setupFile, '--wrangler', options.wranglerFile])
+        if (!resumed.ok) throw new Error('域名切换后的平台配置失败，请运行 npm run setup:platforms -- --verify 查看诊断')
+        if (/^CLOUDFLARE_ZONE_STATUS=(?!active\s*$)/m.test(resumed.output) || resumed.output.includes('EMAIL_ROUTING_DEFERRED=')) throw new Error('Cloudflare Zone 尚未激活，请稍后重新运行 npm run setup -- --apply')
+        const resumedRouting = resumed.output.match(/^EMAIL_ROUTING_(?:PENDING|READY)=(.+)$/m)?.[1]
+        if (resumedRouting) log(resumedRouting)
       }
-      log('初始化结束。未部署、未配置 OAuth 客户端或域名 DNS；请运行 npm run doctor。')
+      log('初始化结束，未部署；请运行 npm run doctor，并验收 OAuth、DNS 与其他外部服务。')
       return 0
     }).catch((error) => {
       log('✗ ' + error.message)

@@ -1,4 +1,9 @@
 # Copy to .dev.vars.platform (gitignored), keep only on the local computer.
 # High-privilege keys must NEVER be copied to Worker secrets or site.setup.json.
 CLOUDFLARE_API_TOKEN=
+# Turnstile 不支持账号级 Token；使用用户级 Token 并授予 Turnstile Sites Write 权限。
+CLOUDFLARE_USER_API_TOKEN=
 RESEND_ADMIN_API_KEY=
+# 可选：Spaceship 注册商 API，用于核对并安全切换 nameserver。
+SPACESHIP_API_KEY=
+SPACESHIP_API_SECRET=

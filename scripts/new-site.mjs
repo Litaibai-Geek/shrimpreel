@@ -10,6 +10,7 @@
 //       --platform（默认不变）--date（站点与文章的 publishedAt/updatedAt，默认今天）
 import { createHash, randomBytes } from 'node:crypto'
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import ts from 'typescript'
 import { site } from '../src/config/site.ts'
 
 const args = process.argv.slice(2)
@@ -132,7 +133,34 @@ if (oldName !== name) {
   changes.push(`${wranglerFile}  ${count} 处资源名 ${oldName} → ${name}`)
 }
 // 只有站点身份变化时清理站点专属值，避免在已有站点重复运行时破坏生产配置。
-if (oldName !== name || site.domain !== domain) {
+const identityChanged = oldName !== name || site.domain !== domain
+if (identityChanged) {
+  // 新站默认只绑定正式域名；复杂或不属于旧站的路由不能自动覆盖。
+  const parsed = ts.parseConfigFileTextToJson(wranglerFile, wrangler)
+  if (parsed.error) throw new Error('wrangler.jsonc 格式无效')
+  if (parsed.config.route) throw new Error('现有单条 Worker route 无法安全迁移，请先核对 wrangler.jsonc')
+  const oldRoutes = parsed.config.routes ?? []
+  if (!Array.isArray(oldRoutes) || oldRoutes.length > 1 || oldRoutes.some((route) =>
+    !route || typeof route !== 'object' || route.custom_domain !== true || ![site.domain, domain].includes(route.pattern))) {
+    throw new Error('现有 Worker 路由无法安全迁移，请先核对 wrangler.jsonc')
+  }
+  const setTopLevel = (source, key, value) => {
+    const tree = ts.parseJsonText(wranglerFile, source)
+    const object = tree.statements[0]?.expression
+    if (!object || !ts.isObjectLiteralExpression(object)) throw new Error('wrangler.jsonc 根配置无效')
+    const prop = object.properties.find((p) => ts.isPropertyAssignment(p) && p.name.getText(tree).replace(/^"|"$/g, '') === key)
+    if (prop && ts.isPropertyAssignment(prop)) {
+      const next = source.slice(0, prop.initializer.getStart(tree)) + JSON.stringify(value) + source.slice(prop.initializer.end)
+      if (next !== source) changes.push(`${wranglerFile}  ${key} 更新`)
+      return next
+    }
+    return replaceOnce(source, wranglerFile, `${key} 添加`, /^(  "name":\s*"[^"]+",)/m, `$1\n  "${key}": ${JSON.stringify(value)},`)
+  }
+  wrangler = setTopLevel(wrangler, 'routes', [{ pattern: domain, custom_domain: true }])
+  wrangler = setTopLevel(wrangler, 'workers_dev', false)
+  wrangler = setTopLevel(wrangler, 'preview_urls', false)
+  wrangler = replaceOnce(wrangler, wranglerFile, 'APP_ENV = production', /("APP_ENV": )"[^"]*"/, '$1"production"')
+  wrangler = replaceOnce(wrangler, wranglerFile, `SITE_URL = https://${domain}`, /("SITE_URL": )"[^"]*"/, `$1"https://${domain}"`)
   for (const key of ['WAFFO_PRODUCTS', 'DODO_PRODUCTS', 'STRIPE_PRODUCTS']) {
     wrangler = replaceOnce(wrangler, wranglerFile, `${key} 清空`, new RegExp(`("${key}": )"(?:[^"\\\\]|\\\\.)*"`), '$1"{}"')
   }
@@ -145,14 +173,16 @@ if (oldName !== name || site.domain !== domain) {
   wrangler = replaceOnce(wrangler, wranglerFile, 'EMAIL_LOGIN_ENABLED 关闭', /("EMAIL_LOGIN_ENABLED": )"[^"]*"/, '$1"false"')
 }
 // 资源 id 属于旧站，新站要重新创建
-wrangler = wrangler.replace(/("database_id": )"(?!0{8}-)[^"]+"/, (_, p) => {
-  changes.push(`${wranglerFile}  database_id 重置为占位值`)
-  return `${p}"00000000-0000-0000-0000-000000000000"`
-})
-wrangler = wrangler.replace(/("binding": "KV", "id": )"(?!0{32})[^"]+"/, (_, p) => {
-  changes.push(`${wranglerFile}  KV id 重置为占位值`)
-  return `${p}"00000000000000000000000000000000"`
-})
+if (identityChanged) {
+  wrangler = wrangler.replace(/("database_id": )"(?!0{8}-)[^"]+"/, (_, p) => {
+    changes.push(`${wranglerFile}  database_id 重置为占位值`)
+    return `${p}"00000000-0000-0000-0000-000000000000"`
+  })
+  wrangler = wrangler.replace(/("binding": "KV", "id": )"(?!0{32})[^"]+"/, (_, p) => {
+    changes.push(`${wranglerFile}  KV id 重置为占位值`)
+    return `${p}"00000000000000000000000000000000"`
+  })
+}
 // Rate Limiting 的 namespace_id 在同一账号内要唯一：按项目名派生一段，避免多个站点共用计数
 const base = 1000 + (parseInt(createHash('sha256').update(name).digest('hex').slice(0, 8), 16) % 8000) * 10
 let limiter = 0

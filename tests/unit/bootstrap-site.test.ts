@@ -263,7 +263,9 @@ describe('bootstrap-site', () => {
       exists: () => true,
       read: (p: string) => p === 'site.setup.json' ? JSON.stringify(configured) : p === '.dev.vars.platform' ? 'CLOUDFLARE_API_TOKEN=test-token\n' : raw,
       write: () => {}, runWrangler: mock.run,
-      runNode: () => ({ ok: false, output: 'Cloudflare zone not found or inaccessible; test-token' }),
+      runNode: (args: string[]) => args[0] === 'scripts/seed-remote.mjs'
+        ? { ok: true, output: '' }
+        : { ok: false, output: 'Cloudflare zone not found or inaccessible; test-token' },
       log: (line: string) => logs.push(line),
     })
     expect(code).toBe(1)
